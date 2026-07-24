@@ -1,6 +1,8 @@
 import { Header } from './components/Header'
+import { InvasiveWatch } from './components/InvasiveWatch'
 import { ObservationMap } from './components/ObservationMap'
 import { RegionSnapshot } from './components/RegionSnapshot'
+import { useInvasives } from './hooks/useInvasives'
 import { useMetrics } from './hooks/useMetrics'
 import { useObservations } from './hooks/useObservations'
 import { useRegions } from './hooks/useRegions'
@@ -20,6 +22,7 @@ export default function App() {
 
   const metricsQuery = useMetrics(regionId)
   const observationsQuery = useObservations(regionId)
+  const invasivesQuery = useInvasives(regionId)
 
   return (
     <div className="min-h-dvh">
@@ -33,6 +36,11 @@ export default function App() {
           metrics={metricsQuery.data}
           isLoading={metricsQuery.isLoading}
           error={metricsQuery.error}
+        />
+        <InvasiveWatch
+          data={invasivesQuery.data}
+          isLoading={invasivesQuery.isLoading}
+          error={invasivesQuery.error}
         />
         <ObservationMap
           observations={observationsQuery.data?.observations ?? []}

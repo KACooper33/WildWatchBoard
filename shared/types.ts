@@ -35,6 +35,29 @@ export interface MetricsDto {
   cachedAt: string | null
 }
 
+export interface InvasiveSpeciesConfig {
+  commonName: string
+  scientificName: string
+  taxonId: number
+}
+
+export interface InvasiveSpeciesAlert {
+  commonName: string
+  scientificName: string
+  taxonId: number
+  observationCount: number
+  latestObservedOn: string | null
+  observations: ObservationDto[]
+}
+
+export interface InvasivesDto {
+  region: string
+  windowDays: number
+  cachedAt: string | null
+  totalInvasiveObservations: number
+  alerts: InvasiveSpeciesAlert[]
+}
+
 export const ICONIC_TAXON_COLORS: Record<string, string> = {
   Aves: '#2f6fed',
   Mammalia: '#b45309',

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { metricsRouter } from './routes/metrics.ts'
 import { observationsRouter } from './routes/observations.ts'
 import { regionsRouter } from './routes/regions.ts'
+import { invasivesRouter } from './routes/invasives.ts'
 
 const app = express()
 const PORT = Number(process.env.PORT || 3001)
@@ -21,6 +22,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/regions', regionsRouter)
 app.use('/api/observations', observationsRouter)
 app.use('/api/metrics', metricsRouter)
+app.use('/api/invasives', invasivesRouter)
 
 const dataDir = join(process.cwd(), 'public', 'data')
 if (existsSync(dataDir)) {

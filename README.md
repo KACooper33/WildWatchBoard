@@ -20,7 +20,7 @@ npm run dev
 ```
 
 - UI: http://localhost:5173  
-- API: http://localhost:3001 (`/api/regions`, `/api/observations`, `/api/metrics`)
+- API: http://localhost:3001 (`/api/regions`, `/api/observations`, `/api/metrics`, `/api/invasives`)
 
 ## Production
 
@@ -46,6 +46,12 @@ Over the last **30 days** (pagination capped):
 - Observations, unique species, research-grade %, observers
 - Quality mix (research / needs ID / casual)
 - Counts by life form (birds, mammals, plants, …)
+
+## Invasive species watch
+
+Flags configured high-priority invasives from `server/config/target_species.json` (Nutria, Yellow Starthistle, Tree of Heaven, Water Hyacinth) within the same observation window. Species with sightings are highlighted; clear species still appear so the watch list is visible.
+
+API: `GET /api/invasives?region=tri-valley`
 
 ## Adding a region
 
