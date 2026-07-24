@@ -1,0 +1,24 @@
+{
+  "invasives": [
+    {
+      "commonName": "Nutria",
+      "scientificName": "Myocastor coypus",
+      "taxonId": 43794
+    },
+    {
+      "commonName": "Yellow Starthistle",
+      "scientificName": "Centaurea solstitialis",
+      "taxonId": 75990
+    },
+    {
+      "commonName": "Tree of Heaven",
+      "scientificName": "Ailanthus altissima",
+      "taxonId": 57963
+    },
+    {
+      "commonName": "Water Hyacinth",
+      "scientificName": "Pontederia crassipes",
+      "taxonId": 60333
+    }
+  ]
+}
