@@ -1,0 +1,65 @@
+{
+  "description": "Sample iNaturalist-like payloads for edge-case handling",
+  "results": [
+    {
+      "id": 1001,
+      "quality_grade": "research",
+      "obscured": true,
+      "public_positional_accuracy": 28000,
+      "location": "37.68,-121.82",
+      "geojson": { "type": "Point", "coordinates": [-121.82, 37.68] },
+      "observed_on": "2026-07-01",
+      "photos": [],
+      "taxon": {
+        "id": 26718,
+        "name": "Ambystoma californiense",
+        "preferred_common_name": "California Tiger Salamander",
+        "iconic_taxon_name": "Amphibia"
+      },
+      "user": { "id": 11, "login": "herp_watcher" }
+    },
+    {
+      "id": 1002,
+      "quality_grade": "needs_id",
+      "obscured": false,
+      "public_positional_accuracy": 10,
+      "location": "37.70,-121.90",
+      "geojson": { "type": "Point", "coordinates": [-121.90, 37.70] },
+      "observed_on": "2026-07-02",
+      "photos": [{ "url": "https://example.invalid/missing.jpg" }],
+      "taxon": {
+        "id": 9083,
+        "name": "Buteo jamaicensis",
+        "preferred_common_name": "Red-tailed Hawk",
+        "iconic_taxon_name": "Aves"
+      },
+      "user": { "id": 22, "login": "bird_nerd" }
+    },
+    {
+      "id": 1003,
+      "quality_grade": "casual",
+      "obscured": false,
+      "location": null,
+      "geojson": null,
+      "observed_on": "2026-07-03",
+      "photos": [],
+      "taxon": {
+        "id": 47126,
+        "name": "Quercus agrifolia",
+        "iconic_taxon_name": "Plantae"
+      },
+      "user": { "id": 33, "login": "oak_spotter" }
+    },
+    {
+      "id": 1004,
+      "quality_grade": "research",
+      "obscured": false,
+      "location": "37.66,-121.87",
+      "geojson": { "type": "Point", "coordinates": [-121.87, 37.66] },
+      "observed_on": "2026-07-04",
+      "photos": [],
+      "taxon": null,
+      "user": { "id": 44, "login": "mystery_obs" }
+    }
+  ]
+}

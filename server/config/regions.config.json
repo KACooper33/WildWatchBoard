@@ -1,0 +1,20 @@
+{
+  "regions": {
+    "tri-valley": {
+      "id": "tri-valley",
+      "name": "Tri-Valley",
+      "description": "Dublin, Pleasanton, Livermore, Del Valle, Sycamore Grove, and Brushy Peak",
+      "geojsonPath": "tri_valley_boundary.geojson",
+      "bbox": {
+        "nelat": 37.78,
+        "nelng": -121.65,
+        "swlat": 37.55,
+        "swlng": -121.98
+      },
+      "windowDays": 30,
+      "maxPages": 5,
+      "perPage": 200
+    }
+  },
+  "defaultRegion": "tri-valley"
+}

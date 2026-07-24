@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+@import 'leaflet/dist/leaflet.css';
+
+:root {
+  --color-bg: #e8efe6;
+  --color-bg-deep: #d5e2d1;
+  --color-ink: #1c2a22;
+  --color-ink-muted: #4a5c52;
+  --color-panel: rgba(252, 250, 245, 0.92);
+  --color-accent: #2d6a4f;
+  --color-accent-soft: #95d5b2;
+  --color-border: rgba(28, 42, 34, 0.12);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  color: var(--color-ink);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, #c7e0c4 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, #b7d0c8 0%, transparent 50%),
+    linear-gradient(165deg, var(--color-bg) 0%, var(--color-bg-deep) 100%);
+  font-family: var(--font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+.leaflet-container {
+  font: inherit;
+  background: #c5d5c8;
+}
+
+.wwb-popup .leaflet-popup-content-wrapper {
+  border-radius: 10px;
+  padding: 0;
+  box-shadow: 0 8px 24px rgba(28, 42, 34, 0.18);
+}
+
+.wwb-popup .leaflet-popup-content {
+  margin: 0;
+  min-width: 160px;
+}
