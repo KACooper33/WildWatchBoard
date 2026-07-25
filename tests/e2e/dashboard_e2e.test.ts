@@ -80,6 +80,64 @@ const mockRegions = {
   ],
 }
 
+const mockInvasives = {
+  region: 'tri-valley',
+  windowDays: 30,
+  cachedAt: '2026-07-23T00:00:00.000Z',
+  totalInvasiveObservations: 2,
+  alerts: [
+    {
+      commonName: 'Yellow Starthistle',
+      scientificName: 'Centaurea solstitialis',
+      taxonId: 75990,
+      observationCount: 2,
+      latestObservedOn: '2026-07-10',
+      observations: [
+        {
+          id: 2001,
+          lat: 37.67,
+          lng: -121.8,
+          obscured: false,
+          publicPositionalAccuracy: 15,
+          displayName: 'Yellow Starthistle',
+          scientificName: 'Centaurea solstitialis',
+          taxonId: 75990,
+          iconicTaxon: 'Plantae',
+          qualityGrade: 'research',
+          observer: 'weed_scout',
+          observerId: 55,
+          observedOn: '2026-07-10',
+          thumbnailUrl: null,
+        },
+      ],
+    },
+    {
+      commonName: 'Nutria',
+      scientificName: 'Myocastor coypus',
+      taxonId: 43794,
+      observationCount: 0,
+      latestObservedOn: null,
+      observations: [],
+    },
+    {
+      commonName: 'Tree of Heaven',
+      scientificName: 'Ailanthus altissima',
+      taxonId: 57963,
+      observationCount: 0,
+      latestObservedOn: null,
+      observations: [],
+    },
+    {
+      commonName: 'Water Hyacinth',
+      scientificName: 'Pontederia crassipes',
+      taxonId: 60333,
+      observationCount: 0,
+      latestObservedOn: null,
+      observations: [],
+    },
+  ],
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/regions', async (route) => {
     await route.fulfill({
@@ -102,13 +160,22 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify(mockObservations),
     })
   })
+  await page.route('**/api/invasives**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockInvasives),
+    })
+  })
 })
 
-test('dashboard loads brand, snapshot, and map', async ({ page }) => {
+test('dashboard loads brand, snapshot, invasives, and map', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'WildWatchBoard' })).toBeVisible()
   await expect(page.getByTestId('region-snapshot')).toBeVisible()
   await expect(page.getByText('Unique species')).toBeVisible()
+  await expect(page.getByTestId('invasive-watch')).toBeVisible()
+  await expect(page.getByText('Yellow Starthistle')).toBeVisible()
   await expect(page.getByTestId('observation-map')).toBeVisible()
   await expect(page.locator('.leaflet-container')).toBeVisible()
 })

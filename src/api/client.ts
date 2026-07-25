@@ -1,4 +1,9 @@
-import type { MetricsDto, ObservationDto, RegionSummary } from '../../shared/types'
+import type {
+  InvasivesDto,
+  MetricsDto,
+  ObservationDto,
+  RegionSummary,
+} from '../../shared/types'
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
@@ -29,4 +34,8 @@ export function fetchObservations(regionId: string) {
 
 export function fetchMetrics(regionId: string) {
   return getJson<MetricsDto>(`/api/metrics?region=${encodeURIComponent(regionId)}`)
+}
+
+export function fetchInvasives(regionId: string) {
+  return getJson<InvasivesDto>(`/api/invasives?region=${encodeURIComponent(regionId)}`)
 }
