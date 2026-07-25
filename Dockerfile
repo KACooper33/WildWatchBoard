@@ -20,7 +20,7 @@ FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=8080
 ENV SQLITE_PATH=/data/wildwatchboard.sqlite
 
 COPY package.json package-lock.json ./
@@ -32,6 +32,6 @@ COPY --from=build /app/public ./public
 
 RUN mkdir -p /data
 
-EXPOSE 3001
+EXPOSE 8080
 
 CMD ["npm", "start"]

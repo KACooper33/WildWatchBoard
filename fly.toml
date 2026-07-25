@@ -10,7 +10,7 @@ primary_region = 'sjc'
 
 [env]
   NODE_ENV = 'production'
-  PORT = '3001'
+  PORT = '8080'
   SQLITE_PATH = '/data/wildwatchboard.sqlite'
 
 [[mounts]]
@@ -29,4 +29,3 @@ primary_region = 'sjc'
   memory = '512mb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 256
