@@ -58,6 +58,27 @@ export interface InvasivesDto {
   alerts: InvasiveSpeciesAlert[]
 }
 
+export type ObservationWindowDays = 7 | 30 | 360
+
+/** @deprecated Use ObservationWindowDays */
+export type LeaderboardWindowDays = ObservationWindowDays
+
+export interface LeaderboardEntry {
+  rank: number
+  observer: string
+  observerId: number | null
+  observationCount: number
+  uniqueSpecies: number
+}
+
+export interface LeaderboardDto {
+  region: string
+  windowDays: ObservationWindowDays
+  cachedAt: string | null
+  observationSampleSize: number
+  entries: LeaderboardEntry[]
+}
+
 export const ICONIC_TAXON_COLORS: Record<string, string> = {
   Aves: '#2f6fed',
   Mammalia: '#b45309',
