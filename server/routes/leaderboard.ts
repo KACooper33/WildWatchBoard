@@ -1,15 +1,15 @@
 import { Router } from 'express'
-import { getInvasivesForRegion } from '../services/invasives.ts'
+import { getLeaderboardForRegion } from '../services/leaderboard.ts'
 
-export const invasivesRouter = Router()
+export const leaderboardRouter = Router()
 
-invasivesRouter.get('/', async (req, res) => {
+leaderboardRouter.get('/', async (req, res) => {
   try {
     const regionId = typeof req.query.region === 'string' ? req.query.region : undefined
-    const payload = await getInvasivesForRegion(regionId, req.query.window ?? 30)
+    const payload = await getLeaderboardForRegion(regionId, req.query.window ?? 30)
     res.json(payload)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load invasives'
+    const message = error instanceof Error ? error.message : 'Failed to load leaderboard'
     let status = 502
     if (message.startsWith('Unknown region')) status = 404
     if (message.startsWith('Invalid time window')) status = 400

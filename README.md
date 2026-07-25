@@ -20,7 +20,7 @@ npm run dev
 ```
 
 - UI: http://localhost:5173  
-- API: http://localhost:3001 (`/api/regions`, `/api/observations`, `/api/metrics`, `/api/invasives`)
+- API: http://localhost:3001 (`/api/regions`, `/api/observations`, `/api/metrics`, `/api/invasives`, `/api/leaderboard`)
 
 ## Production
 
@@ -52,6 +52,12 @@ Over the last **30 days** (pagination capped):
 Flags configured high-priority invasives from `server/config/target_species.json` (Nutria, Yellow Starthistle, Tree of Heaven, Water Hyacinth) within the same observation window. Species with sightings are highlighted; clear species still appear so the watch list is visible.
 
 API: `GET /api/invasives?region=tri-valley`
+
+## Community leaderboard
+
+Ranks top contributors by observation count. Shows the top 10 (about 5 visible, scroll for the rest).
+
+A shared **7 / 30 / 360** day toggle drives snapshot, invasives, leaderboard, and map together (`?window=` on those API routes).
 
 ## Adding a region
 

@@ -1,8 +1,13 @@
+import { useState } from 'react'
+import type { ObservationWindowDays } from '../shared/types'
 import { Header } from './components/Header'
 import { InvasiveWatch } from './components/InvasiveWatch'
+import { Leaderboard } from './components/Leaderboard'
 import { ObservationMap } from './components/ObservationMap'
 import { RegionSnapshot } from './components/RegionSnapshot'
+import { TimeWindowToggle } from './components/TimeWindowToggle'
 import { useInvasives } from './hooks/useInvasives'
+import { useLeaderboard } from './hooks/useLeaderboard'
 import { useMetrics } from './hooks/useMetrics'
 import { useObservations } from './hooks/useObservations'
 import { useRegions } from './hooks/useRegions'
@@ -20,9 +25,12 @@ export default function App() {
         'Dublin, Pleasanton, Livermore, Del Valle, Sycamore Grove, and Brushy Peak',
     }
 
-  const metricsQuery = useMetrics(regionId)
-  const observationsQuery = useObservations(regionId)
-  const invasivesQuery = useInvasives(regionId)
+  const [windowDays, setWindowDays] = useState<ObservationWindowDays>(30)
+
+  const metricsQuery = useMetrics(regionId, windowDays)
+  const observationsQuery = useObservations(regionId, windowDays)
+  const invasivesQuery = useInvasives(regionId, windowDays)
+  const leaderboardQuery = useLeaderboard(regionId, windowDays)
 
   return (
     <div className="min-h-dvh">
@@ -32,6 +40,7 @@ export default function App() {
       />
 
       <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-6">
+        <TimeWindowToggle windowDays={windowDays} onChange={setWindowDays} />
         <RegionSnapshot
           metrics={metricsQuery.data}
           isLoading={metricsQuery.isLoading}
@@ -41,6 +50,11 @@ export default function App() {
           data={invasivesQuery.data}
           isLoading={invasivesQuery.isLoading}
           error={invasivesQuery.error}
+        />
+        <Leaderboard
+          data={leaderboardQuery.data}
+          isLoading={leaderboardQuery.isLoading}
+          error={leaderboardQuery.error}
         />
         <ObservationMap
           observations={observationsQuery.data?.observations ?? []}

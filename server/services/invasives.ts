@@ -8,6 +8,10 @@ import type {
   ObservationDto,
 } from '../../shared/types.ts'
 import { getObservationsForRegion } from './inaturalist.ts'
+import {
+  observationQueryOptions,
+  parseObservationWindow,
+} from './timeWindow.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -55,9 +59,16 @@ function latestDate(dates: Array<string | null>): string | null {
   return valid.length ? valid[valid.length - 1]! : null
 }
 
-export async function getInvasivesForRegion(regionId?: string): Promise<InvasivesDto> {
+export async function getInvasivesForRegion(
+  regionId?: string,
+  windowDaysRaw: unknown = 30,
+): Promise<InvasivesDto> {
   const targets = loadTargetSpecies()
-  const { observations, cachedAt, region } = await getObservationsForRegion(regionId)
+  const windowDays = parseObservationWindow(windowDaysRaw)
+  const { observations, cachedAt, region } = await getObservationsForRegion(
+    regionId,
+    observationQueryOptions(regionId, windowDays),
+  )
 
   const alerts: InvasiveSpeciesAlert[] = targets.map((species) => {
     const hits = observations
@@ -83,7 +94,7 @@ export async function getInvasivesForRegion(regionId?: string): Promise<Invasive
 
   return {
     region: region.id,
-    windowDays: region.windowDays,
+    windowDays,
     cachedAt,
     totalInvasiveObservations: alerts.reduce((sum, a) => sum + a.observationCount, 0),
     alerts,
