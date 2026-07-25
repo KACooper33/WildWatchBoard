@@ -13,8 +13,12 @@ import type { ObservationDto } from '../../shared/types'
 import { ICONIC_TAXON_COLORS, ICONIC_TAXON_LABELS } from '../../shared/types'
 
 interface ObservationMapProps {
+  /** Already filtered when a taxon filter is applied. */
   observations: ObservationDto[]
   isLoading: boolean
+  /** Empty = all groups. */
+  appliedTaxa: string[]
+  isFilterPending?: boolean
 }
 
 const FALLBACK_CENTER: [number, number] = [37.68, -121.82]
@@ -101,7 +105,23 @@ function ObservationPopup({ obs }: { obs: ObservationDto }) {
   )
 }
 
-export function ObservationMap({ observations, isLoading }: ObservationMapProps) {
+function topSpecies(observations: ObservationDto[], limit = 8) {
+  const counts = new Map<string, number>()
+  for (const obs of observations) {
+    const name = obs.displayName || obs.scientificName || 'Unknown'
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+}
+
+export function ObservationMap({
+  observations,
+  isLoading,
+  appliedTaxa,
+  isFilterPending = false,
+}: ObservationMapProps) {
   const [boundary, setBoundary] = useState<FeatureCollection | null>(null)
 
   useEffect(() => {
@@ -127,19 +147,72 @@ export function ObservationMap({ observations, isLoading }: ObservationMapProps)
     [observations],
   )
 
+  const species = useMemo(() => topSpecies(observations), [observations])
+  const filterActive = appliedTaxa.length > 0
+  const filterLabel = appliedTaxa.map((t) => ICONIC_TAXON_LABELS[t] ?? t).join(', ')
+  const showPending = isLoading || isFilterPending
+
   return (
     <section
-      className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] shadow-sm"
+      className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] shadow-sm"
       data-testid="observation-map"
+      aria-busy={showPending}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)] px-4 py-3">
-        <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
-          Observations map
-        </h2>
+      {isFilterPending ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--color-panel)]/65">
+          <p className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-medium shadow-sm">
+            <span
+              className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent"
+              aria-hidden
+            />
+            Updating map…
+          </p>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] px-4 py-3">
+        <div>
+          <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
+            Observations map
+          </h2>
+          {filterActive ? (
+            <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+              Filtered: {filterLabel}
+            </p>
+          ) : null}
+        </div>
         <p className="text-sm text-[var(--color-ink-muted)]">
-          {isLoading ? 'Loading…' : `${mappable.length} mapped`}
+          {showPending
+            ? 'Updating…'
+            : filterActive
+              ? `${mappable.length} mapped · ${observations.length} in filter`
+              : `${mappable.length} mapped`}
         </p>
       </div>
+
+      {filterActive && !showPending ? (
+        <div
+          className="border-b border-[var(--color-border)] bg-white/50 px-4 py-3"
+          data-testid="taxon-filter-results"
+        >
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+            Top species in filter
+          </p>
+          {species.length === 0 ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">No observations in these groups.</p>
+          ) : (
+            <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+              {species.map(([name, count]) => (
+                <li key={name} className="text-[var(--color-ink)]">
+                  {name}{' '}
+                  <span className="tabular-nums text-[var(--color-ink-muted)]">({count})</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
       <div className="h-[50vh] min-h-[280px] w-full sm:h-[min(62vh,640px)]">
         <MapContainer
           center={FALLBACK_CENTER}

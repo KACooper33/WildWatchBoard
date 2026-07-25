@@ -85,11 +85,34 @@ function pctChange(current: number, previous: number): number | null {
   return Math.round(((current - previous) / previous) * 1000) / 10
 }
 
+function parseTaxaFilter(raw: unknown): string[] {
+  const values: string[] = []
+  if (typeof raw === 'string' && raw.trim()) {
+    values.push(...raw.split(','))
+  } else if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === 'string' && item.trim()) values.push(...item.split(','))
+    }
+  }
+  return [...new Set(values.map((v) => v.trim()).filter(Boolean))]
+}
+
+function filterObservationsByTaxa(
+  observations: ObservationDto[],
+  taxa: string[],
+): ObservationDto[] {
+  if (taxa.length === 0) return observations
+  const allowed = new Set(taxa)
+  return observations.filter((obs) => allowed.has(obs.iconicTaxon))
+}
+
 export async function getTrendsForRegion(
   regionId: string | undefined,
   windowDaysRaw: unknown,
+  taxaRaw: unknown = undefined,
 ): Promise<TrendsDto> {
   const windowDays = parseObservationWindow(windowDaysRaw) as ObservationWindowDays
+  const appliedTaxa = parseTaxaFilter(taxaRaw)
   const region = getRegion(regionId)
   const priorAvailable = windowDays <= MAX_TREND_COMPARE_WINDOW
   const maxPages = observationQueryOptions(regionId, windowDays).maxPages
@@ -100,12 +123,8 @@ export async function getTrendsForRegion(
     windowDays,
     maxPages,
   })
-  const current = toPeriodMetrics(
-    region.id,
-    windowDays,
-    currentFetch.observations,
-    invasives,
-  )
+  const currentObs = filterObservationsByTaxa(currentFetch.observations, appliedTaxa)
+  const current = toPeriodMetrics(region.id, windowDays, currentObs, invasives)
 
   if (!priorAvailable) {
     return {
@@ -113,6 +132,7 @@ export async function getTrendsForRegion(
       windowDays,
       cachedAt: currentFetch.cachedAt,
       priorAvailable: false,
+      appliedTaxa,
       current,
       previous: emptyPeriod(),
       deltas: {
@@ -139,18 +159,15 @@ export async function getTrendsForRegion(
     priorEnd,
     maxPages,
   )
-  const previous = toPeriodMetrics(
-    region.id,
-    windowDays,
-    priorFetch.observations,
-    invasives,
-  )
+  const previousObs = filterObservationsByTaxa(priorFetch.observations, appliedTaxa)
+  const previous = toPeriodMetrics(region.id, windowDays, previousObs, invasives)
 
   return {
     region: region.id,
     windowDays,
     cachedAt: currentFetch.cachedAt,
     priorAvailable: true,
+    appliedTaxa,
     current,
     previous,
     deltas: {

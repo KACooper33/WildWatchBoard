@@ -98,6 +98,8 @@ export interface TrendsDto {
   cachedAt: string | null
   /** False only if a prior window cannot be fetched fairly. */
   priorAvailable: boolean
+  /** Iconic taxa included in this trends payload (empty = all groups). */
+  appliedTaxa: string[]
   current: TrendPeriodMetrics
   previous: TrendPeriodMetrics
   deltas: {

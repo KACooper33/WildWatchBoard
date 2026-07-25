@@ -177,6 +177,7 @@ const mockTrends = {
   windowDays: 30,
   cachedAt: '2026-07-23T00:00:00.000Z',
   priorAvailable: true,
+  appliedTaxa: [],
   current: {
     observationCount: 120,
     uniqueSpecies: 80,
@@ -237,10 +238,15 @@ test.beforeEach(async ({ page }) => {
     })
   })
   await page.route('**/api/trends**', async (route) => {
+    const url = new URL(route.request().url())
+    const taxaParam = url.searchParams.get('taxa')
+    const appliedTaxa = taxaParam
+      ? taxaParam.split(',').map((t) => t.trim()).filter(Boolean)
+      : []
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(mockTrends),
+      body: JSON.stringify({ ...mockTrends, appliedTaxa }),
     })
   })
 })
@@ -262,4 +268,12 @@ test('dashboard loads brand, snapshot, trends, invasives, leaderboard, and map',
   await expect(page.getByText('top_spotter')).toBeVisible()
   await expect(page.getByTestId('observation-map')).toBeVisible()
   await expect(page.locator('.leaflet-container')).toBeVisible()
+
+  await page.getByRole('button', { name: /Birds/i }).click()
+  await page.getByTestId('taxon-filter-apply').click()
+  await expect(page.getByTestId('taxon-filter-banner')).toBeVisible()
+  await expect(page.getByTestId('snapshot-summary')).toContainText('Filtered')
+  await expect(page.getByTestId('trends-panel')).toContainText(/filtered to Birds/i)
+  await expect(page.getByTestId('taxon-filter-results')).toBeVisible()
+  await expect(page.getByText(/Filtered: Birds/i)).toBeVisible()
 })

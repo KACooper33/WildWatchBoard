@@ -21,8 +21,18 @@ async function getJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-function withWindow(path: string, regionId: string, windowDays: ObservationWindowDays) {
-  return `${path}?region=${encodeURIComponent(regionId)}&window=${windowDays}`
+function withWindow(
+  path: string,
+  regionId: string,
+  windowDays: ObservationWindowDays,
+  taxa: string[] = [],
+) {
+  const params = new URLSearchParams({
+    region: regionId,
+    window: String(windowDays),
+  })
+  if (taxa.length > 0) params.set('taxa', taxa.join(','))
+  return `${path}?${params.toString()}`
 }
 
 export function fetchRegions() {
@@ -51,6 +61,10 @@ export function fetchLeaderboard(regionId: string, windowDays: ObservationWindow
   return getJson<LeaderboardDto>(withWindow('/api/leaderboard', regionId, windowDays))
 }
 
-export function fetchTrends(regionId: string, windowDays: ObservationWindowDays) {
-  return getJson<TrendsDto>(withWindow('/api/trends', regionId, windowDays))
+export function fetchTrends(
+  regionId: string,
+  windowDays: ObservationWindowDays,
+  taxa: string[] = [],
+) {
+  return getJson<TrendsDto>(withWindow('/api/trends', regionId, windowDays, taxa))
 }

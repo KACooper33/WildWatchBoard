@@ -6,7 +6,11 @@ export const trendsRouter = Router()
 trendsRouter.get('/', async (req, res) => {
   try {
     const regionId = typeof req.query.region === 'string' ? req.query.region : undefined
-    const payload = await getTrendsForRegion(regionId, req.query.window ?? 30)
+    const payload = await getTrendsForRegion(
+      regionId,
+      req.query.window ?? 30,
+      req.query.taxa,
+    )
     res.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load trends'

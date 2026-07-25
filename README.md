@@ -69,6 +69,8 @@ Over the last **30 days** (pagination capped):
 - Quality mix (research / needs ID / casual)
 - Counts by life form (birds, mammals, plants, …)
 
+Select one or more life-form groups in the snapshot, then **Apply filter** to update snapshot metrics, comparable trends (Now vs Prior for those groups), the map, and a short top-species list. Group chip counts stay for the full window so you can keep selecting. **Clear** resets to all groups.
+
 ## Invasive species watch
 
 Flags configured high-priority invasives from `server/config/target_species.json` (Nutria, Yellow Starthistle, Tree of Heaven, Water Hyacinth). Each species shows **Now vs Prior** counts for the shared 7 / 30 / 90 day window (equal page budgets per period, same fairness rule as trends). Species with current sightings are highlighted; clear species still appear so the watch list is visible.

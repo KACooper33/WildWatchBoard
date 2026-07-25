@@ -1,8 +1,10 @@
 import type { TrendsDto } from '../../shared/types'
+import { ICONIC_TAXON_LABELS } from '../../shared/types'
 
 interface TrendsPanelProps {
   data?: TrendsDto
   isLoading: boolean
+  isFilterPending?: boolean
   error?: Error | null
 }
 
@@ -64,7 +66,12 @@ function TrendRow({
   )
 }
 
-export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
+export function TrendsPanel({
+  data,
+  isLoading,
+  isFilterPending = false,
+  error,
+}: TrendsPanelProps) {
   if (error) {
     return (
       <section className="rounded-2xl border border-red-200 bg-red-50/80 p-4 text-sm text-red-900">
@@ -73,7 +80,7 @@ export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
     )
   }
 
-  if (isLoading || !data) {
+  if ((isLoading && !data) || !data) {
     return (
       <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-4">
         <p className="text-sm text-[var(--color-ink-muted)]">Loading trends…</p>
@@ -82,12 +89,27 @@ export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
   }
 
   const showPrior = data.priorAvailable
+  const filterActive = data.appliedTaxa.length > 0
+  const filterLabel = data.appliedTaxa.map((t) => ICONIC_TAXON_LABELS[t] ?? t).join(', ')
 
   return (
     <section
-      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-4 shadow-sm sm:p-5"
+      className="relative rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-4 shadow-sm sm:p-5"
       data-testid="trends-panel"
+      aria-busy={isFilterPending}
     >
+      {isFilterPending ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-[var(--color-panel)]/70">
+          <p className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-medium shadow-sm">
+            <span
+              className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent"
+              aria-hidden
+            />
+            Updating trends…
+          </p>
+        </div>
+      ) : null}
+
       <div className="mb-3">
         <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
           Comparable trends
@@ -96,6 +118,7 @@ export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
           {showPrior
             ? `Current ${data.windowDays} days vs previous ${data.windowDays} days`
             : `Last ${data.windowDays} days`}
+          {filterActive ? ` · filtered to ${filterLabel}` : ''}
         </p>
       </div>
 
