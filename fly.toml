@@ -1,0 +1,30 @@
+# fly.toml app configuration file for WildWatchBoard
+#
+# See https://fly.io/docs/reference/configuration/
+
+app = 'wildwatchboard'
+primary_region = 'sjc'
+
+[build]
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3001'
+  SQLITE_PATH = '/data/wildwatchboard.sqlite'
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[[mounts]]
+  source = 'wildwatch_data'
+  destination = '/data'
