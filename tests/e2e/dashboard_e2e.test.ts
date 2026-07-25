@@ -138,6 +138,29 @@ const mockInvasives = {
   ],
 }
 
+const mockLeaderboard = {
+  region: 'tri-valley',
+  windowDays: 30,
+  cachedAt: '2026-07-23T00:00:00.000Z',
+  observationSampleSize: 12,
+  entries: [
+    {
+      rank: 1,
+      observer: 'top_spotter',
+      observerId: 101,
+      observationCount: 8,
+      uniqueSpecies: 5,
+    },
+    {
+      rank: 2,
+      observer: 'bird_nerd',
+      observerId: 22,
+      observationCount: 3,
+      uniqueSpecies: 2,
+    },
+  ],
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/regions', async (route) => {
     await route.fulfill({
@@ -167,15 +190,26 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify(mockInvasives),
     })
   })
+  await page.route('**/api/leaderboard**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockLeaderboard),
+    })
+  })
 })
 
-test('dashboard loads brand, snapshot, invasives, and map', async ({ page }) => {
+test('dashboard loads brand, snapshot, invasives, leaderboard, and map', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'WildWatchBoard' })).toBeVisible()
+  await expect(page.getByTestId('time-window-toggle')).toBeVisible()
+  await expect(page.getByRole('tab', { name: '30d' })).toBeVisible()
   await expect(page.getByTestId('region-snapshot')).toBeVisible()
   await expect(page.getByText('Unique species')).toBeVisible()
   await expect(page.getByTestId('invasive-watch')).toBeVisible()
   await expect(page.getByText('Yellow Starthistle')).toBeVisible()
+  await expect(page.getByTestId('leaderboard')).toBeVisible()
+  await expect(page.getByText('top_spotter')).toBeVisible()
   await expect(page.getByTestId('observation-map')).toBeVisible()
   await expect(page.locator('.leaflet-container')).toBeVisible()
 })

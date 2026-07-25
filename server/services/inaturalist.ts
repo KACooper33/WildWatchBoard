@@ -172,11 +172,15 @@ function windowStartDate(windowDays: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-async function fetchAndFilter(region: RegionConfig): Promise<ObservationDto[]> {
-  const d1 = windowStartDate(region.windowDays)
+async function fetchAndFilter(
+  region: RegionConfig,
+  windowDays: number,
+  maxPages: number,
+): Promise<ObservationDto[]> {
+  const d1 = windowStartDate(windowDays)
   const all: ObservationDto[] = []
 
-  for (let page = 1; page <= region.maxPages; page += 1) {
+  for (let page = 1; page <= maxPages; page += 1) {
     if (page > 1) {
       await sleep(PAGE_DELAY_MS)
     }
@@ -200,21 +204,29 @@ async function fetchAndFilter(region: RegionConfig): Promise<ObservationDto[]> {
   return all
 }
 
+export interface ObservationQueryOptions {
+  windowDays?: number
+  maxPages?: number
+}
+
 export async function getObservationsForRegion(
   regionId?: string,
-): Promise<{ observations: ObservationDto[]; cachedAt: string; region: RegionConfig }> {
+  options: ObservationQueryOptions = {},
+): Promise<{ observations: ObservationDto[]; cachedAt: string; region: RegionConfig; windowDays: number }> {
   const region = getRegion(regionId)
-  const cacheKey = `${region.id}:${region.windowDays}`
+  const windowDays = options.windowDays ?? region.windowDays
+  const maxPages = options.maxPages ?? region.maxPages
+  const cacheKey = `${region.id}:${windowDays}:${maxPages}`
   const now = Date.now()
   const hit = observationCache.get(cacheKey)
 
   if (hit && hit.expiresAt > now) {
-    return { observations: hit.value, cachedAt: hit.cachedAt, region }
+    return { observations: hit.value, cachedAt: hit.cachedAt, region, windowDays }
   }
 
   let pending = inflight.get(cacheKey)
   if (!pending) {
-    pending = fetchAndFilter(region).finally(() => {
+    pending = fetchAndFilter(region, windowDays, maxPages).finally(() => {
       inflight.delete(cacheKey)
     })
     inflight.set(cacheKey, pending)
@@ -228,7 +240,7 @@ export async function getObservationsForRegion(
     cachedAt,
   })
 
-  return { observations, cachedAt, region }
+  return { observations, cachedAt, region, windowDays }
 }
 
 export function getCacheTtlMs(): number {

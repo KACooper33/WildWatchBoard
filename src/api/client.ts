@@ -1,7 +1,9 @@
 import type {
   InvasivesDto,
+  LeaderboardDto,
   MetricsDto,
   ObservationDto,
+  ObservationWindowDays,
   RegionSummary,
 } from '../../shared/types'
 
@@ -18,24 +20,32 @@ async function getJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
+function withWindow(path: string, regionId: string, windowDays: ObservationWindowDays) {
+  return `${path}?region=${encodeURIComponent(regionId)}&window=${windowDays}`
+}
+
 export function fetchRegions() {
   return getJson<{ defaultRegion: string; regions: RegionSummary[] }>('/api/regions')
 }
 
-export function fetchObservations(regionId: string) {
+export function fetchObservations(regionId: string, windowDays: ObservationWindowDays) {
   return getJson<{
     region: string
     windowDays: number
     cachedAt: string
     count: number
     observations: ObservationDto[]
-  }>(`/api/observations?region=${encodeURIComponent(regionId)}`)
+  }>(withWindow('/api/observations', regionId, windowDays))
 }
 
-export function fetchMetrics(regionId: string) {
-  return getJson<MetricsDto>(`/api/metrics?region=${encodeURIComponent(regionId)}`)
+export function fetchMetrics(regionId: string, windowDays: ObservationWindowDays) {
+  return getJson<MetricsDto>(withWindow('/api/metrics', regionId, windowDays))
 }
 
-export function fetchInvasives(regionId: string) {
-  return getJson<InvasivesDto>(`/api/invasives?region=${encodeURIComponent(regionId)}`)
+export function fetchInvasives(regionId: string, windowDays: ObservationWindowDays) {
+  return getJson<InvasivesDto>(withWindow('/api/invasives', regionId, windowDays))
+}
+
+export function fetchLeaderboard(regionId: string, windowDays: ObservationWindowDays) {
+  return getJson<LeaderboardDto>(withWindow('/api/leaderboard', regionId, windowDays))
 }
