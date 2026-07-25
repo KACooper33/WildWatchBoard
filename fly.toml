@@ -1,6 +1,7 @@
-# fly.toml app configuration file for WildWatchBoard
+# fly.toml app configuration file generated for wildwatchboard on 2026-07-25T04:06:42Z
 #
-# See https://fly.io/docs/reference/configuration/
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = 'wildwatchboard'
 primary_region = 'sjc'
@@ -12,8 +13,12 @@ primary_region = 'sjc'
   PORT = '3001'
   SQLITE_PATH = '/data/wildwatchboard.sqlite'
 
+[[mounts]]
+  source = 'wildwatch_data'
+  destination = '/data'
+
 [http_service]
-  internal_port = 3001
+  internal_port = 8080
   force_https = true
   auto_stop_machines = 'off'
   auto_start_machines = true
@@ -24,7 +29,4 @@ primary_region = 'sjc'
   memory = '512mb'
   cpu_kind = 'shared'
   cpus = 1
-
-[[mounts]]
-  source = 'wildwatch_data'
-  destination = '/data'
+  memory_mb = 256
