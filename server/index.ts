@@ -46,8 +46,8 @@ if (isProd) {
   })
 }
 
-app.listen(PORT, () => {
-  console.log(`WildWatchBoard API listening on http://localhost:${PORT}`)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`WildWatchBoard API listening on http://0.0.0.0:${PORT}`)
   if (!isProd) {
     console.log(`Dev UI: http://localhost:5173 (proxied /api → :${PORT})`)
   }
