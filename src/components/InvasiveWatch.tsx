@@ -17,6 +17,17 @@ function formatDate(value: string | null): string {
   })
 }
 
+/** More invasives is worse — reverse the usual “up is good” coloring. */
+function formatDelta(pct: number | null): { text: string; className: string } {
+  if (pct == null) return { text: '—', className: 'text-[var(--color-ink-muted)]' }
+  if (pct === 0) return { text: '0%', className: 'text-[var(--color-ink-muted)]' }
+  const up = pct > 0
+  return {
+    text: `${up ? '+' : ''}${pct}%`,
+    className: up ? 'text-amber-900' : 'text-emerald-800',
+  }
+}
+
 export function InvasiveWatch({ data, isLoading, error }: InvasiveWatchProps) {
   if (error) {
     return (
@@ -37,7 +48,9 @@ export function InvasiveWatch({ data, isLoading, error }: InvasiveWatchProps) {
     )
   }
 
+  const showPrior = data.priorAvailable
   const activeCount = data.alerts.filter((a) => a.observationCount > 0).length
+  const totalDelta = formatDelta(data.totalInvasiveObservationsPct)
 
   return (
     <section
@@ -50,24 +63,40 @@ export function InvasiveWatch({ data, isLoading, error }: InvasiveWatchProps) {
             Invasive species watch
           </h2>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            High-priority regional invasives in the last {data.windowDays} days
+            {showPrior
+              ? `Current ${data.windowDays} days vs previous ${data.windowDays} days`
+              : `High-priority regional invasives in the last ${data.windowDays} days`}
           </p>
         </div>
-        <p className="text-sm font-medium text-[var(--color-ink-muted)]">
-          {activeCount > 0
-            ? `${activeCount} flagged · ${data.totalInvasiveObservations} sightings`
-            : 'No target invasives in this window'}
-        </p>
+        <div className="text-right text-sm font-medium text-[var(--color-ink-muted)]">
+          <p>
+            {activeCount > 0
+              ? `${activeCount} flagged · ${data.totalInvasiveObservations} sightings`
+              : 'No target invasives in this window'}
+          </p>
+          {showPrior ? (
+            <p className="mt-0.5 text-xs font-normal">
+              Prior {data.previousTotalInvasiveObservations}
+              {totalDelta.text !== '—' ? (
+                <>
+                  {' · '}
+                  <span className={`font-semibold ${totalDelta.className}`}>{totalDelta.text}</span>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <ul className="grid gap-3 sm:grid-cols-2">
         {data.alerts.map((alert) => {
-          const hasHits = alert.observationCount > 0
+          const hasHits = alert.observationCount > 0 || alert.previousObservationCount > 0
+          const delta = formatDelta(alert.observationCountPct)
           return (
             <li
               key={alert.taxonId}
               className={
-                hasHits
+                alert.observationCount > 0
                   ? 'rounded-xl border border-amber-300/80 bg-amber-50/70 p-3.5'
                   : 'rounded-xl border border-[var(--color-border)] bg-white/55 p-3.5'
               }
@@ -79,22 +108,54 @@ export function InvasiveWatch({ data, isLoading, error }: InvasiveWatchProps) {
                     {alert.scientificName}
                   </p>
                 </div>
-                <span
-                  className={
-                    hasHits
-                      ? 'rounded-full bg-amber-200/80 px-2.5 py-0.5 text-xs font-semibold text-amber-950'
-                      : 'rounded-full bg-[var(--color-bg-deep)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-ink-muted)]'
-                  }
-                >
-                  {hasHits ? `${alert.observationCount} seen` : 'Clear'}
-                </span>
+                {!showPrior ? (
+                  <span
+                    className={
+                      alert.observationCount > 0
+                        ? 'rounded-full bg-amber-200/80 px-2.5 py-0.5 text-xs font-semibold text-amber-950'
+                        : 'rounded-full bg-[var(--color-bg-deep)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-ink-muted)]'
+                    }
+                  >
+                    {alert.observationCount > 0
+                      ? `${alert.observationCount} seen`
+                      : 'Clear'}
+                  </span>
+                ) : null}
               </div>
+
+              {showPrior ? (
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                      Now
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums">{alert.observationCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                      Prior
+                    </p>
+                    <p className="text-sm tabular-nums text-[var(--color-ink-muted)]">
+                      {alert.previousObservationCount}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                      Δ
+                    </p>
+                    <p className={`text-sm font-semibold tabular-nums ${delta.className}`}>
+                      {delta.text}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               <p className="mt-2 text-xs text-[var(--color-ink-muted)]">
                 Latest: {formatDate(alert.latestObservedOn)}
+                {!hasHits && showPrior ? ' · clear both periods' : null}
               </p>
 
-              {hasHits ? (
+              {alert.observationCount > 0 ? (
                 <ul className="mt-3 space-y-1.5 border-t border-amber-200/70 pt-2.5">
                   {alert.observations.slice(0, 3).map((obs) => (
                     <li

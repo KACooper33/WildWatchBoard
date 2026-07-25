@@ -5,6 +5,7 @@ import type {
   ObservationDto,
   ObservationWindowDays,
   RegionSummary,
+  TrendsDto,
 } from '../../shared/types'
 
 async function getJson<T>(url: string): Promise<T> {
@@ -48,4 +49,8 @@ export function fetchInvasives(regionId: string, windowDays: ObservationWindowDa
 
 export function fetchLeaderboard(regionId: string, windowDays: ObservationWindowDays) {
   return getJson<LeaderboardDto>(withWindow('/api/leaderboard', regionId, windowDays))
+}
+
+export function fetchTrends(regionId: string, windowDays: ObservationWindowDays) {
+  return getJson<TrendsDto>(withWindow('/api/trends', regionId, windowDays))
 }

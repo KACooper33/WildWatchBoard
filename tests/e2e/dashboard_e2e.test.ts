@@ -84,13 +84,18 @@ const mockInvasives = {
   region: 'tri-valley',
   windowDays: 30,
   cachedAt: '2026-07-23T00:00:00.000Z',
+  priorAvailable: true,
   totalInvasiveObservations: 2,
+  previousTotalInvasiveObservations: 3,
+  totalInvasiveObservationsPct: -33.3,
   alerts: [
     {
       commonName: 'Yellow Starthistle',
       scientificName: 'Centaurea solstitialis',
       taxonId: 75990,
       observationCount: 2,
+      previousObservationCount: 3,
+      observationCountPct: -33.3,
       latestObservedOn: '2026-07-10',
       observations: [
         {
@@ -116,6 +121,8 @@ const mockInvasives = {
       scientificName: 'Myocastor coypus',
       taxonId: 43794,
       observationCount: 0,
+      previousObservationCount: 0,
+      observationCountPct: 0,
       latestObservedOn: null,
       observations: [],
     },
@@ -124,6 +131,8 @@ const mockInvasives = {
       scientificName: 'Ailanthus altissima',
       taxonId: 57963,
       observationCount: 0,
+      previousObservationCount: 0,
+      observationCountPct: 0,
       latestObservedOn: null,
       observations: [],
     },
@@ -132,6 +141,8 @@ const mockInvasives = {
       scientificName: 'Pontederia crassipes',
       taxonId: 60333,
       observationCount: 0,
+      previousObservationCount: 0,
+      observationCountPct: 0,
       latestObservedOn: null,
       observations: [],
     },
@@ -159,6 +170,34 @@ const mockLeaderboard = {
       uniqueSpecies: 2,
     },
   ],
+}
+
+const mockTrends = {
+  region: 'tri-valley',
+  windowDays: 30,
+  cachedAt: '2026-07-23T00:00:00.000Z',
+  priorAvailable: true,
+  current: {
+    observationCount: 120,
+    uniqueSpecies: 80,
+    observerCount: 40,
+    researchGradePercent: 55,
+    invasiveCount: 2,
+  },
+  previous: {
+    observationCount: 100,
+    uniqueSpecies: 70,
+    observerCount: 35,
+    researchGradePercent: 50,
+    invasiveCount: 3,
+  },
+  deltas: {
+    observationCountPct: 20,
+    uniqueSpeciesPct: 14.3,
+    observerCountPct: 14.3,
+    researchGradePercentPts: 5,
+    invasiveCountPct: -33.3,
+  },
 }
 
 test.beforeEach(async ({ page }) => {
@@ -197,15 +236,26 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify(mockLeaderboard),
     })
   })
+  await page.route('**/api/trends**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockTrends),
+    })
+  })
 })
 
-test('dashboard loads brand, snapshot, invasives, leaderboard, and map', async ({ page }) => {
+test('dashboard loads brand, snapshot, trends, invasives, leaderboard, and map', async ({
+  page,
+}) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'WildWatchBoard' })).toBeVisible()
   await expect(page.getByTestId('time-window-toggle')).toBeVisible()
   await expect(page.getByRole('tab', { name: '30d' })).toBeVisible()
   await expect(page.getByTestId('region-snapshot')).toBeVisible()
-  await expect(page.getByText('Unique species')).toBeVisible()
+  await expect(page.getByTestId('region-snapshot').getByText('Unique species')).toBeVisible()
+  await expect(page.getByTestId('trends-panel')).toBeVisible()
+  await expect(page.getByText('Comparable trends')).toBeVisible()
   await expect(page.getByTestId('invasive-watch')).toBeVisible()
   await expect(page.getByText('Yellow Starthistle')).toBeVisible()
   await expect(page.getByTestId('leaderboard')).toBeVisible()

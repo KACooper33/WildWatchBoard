@@ -7,7 +7,7 @@ Data is sourced from the [iNaturalist API](https://api.inaturalist.org/v1/), fil
 ## Stack
 
 - React + TypeScript + Vite + Tailwind CSS
-- Express API (`server/`) with in-memory TTL cache + request throttle
+- Express API (`server/`) with SQLite persistence + in-memory TTL cache + request throttle
 - React-Leaflet map
 - TanStack Query
 - Playwright e2e (mocked API)
@@ -20,7 +20,7 @@ npm run dev
 ```
 
 - UI: http://localhost:5173  
-- API: http://localhost:3001 (`/api/regions`, `/api/observations`, `/api/metrics`, `/api/invasives`, `/api/leaderboard`)
+- API: http://localhost:3001 (`/api/regions`, `/api/observations`, `/api/metrics`, `/api/invasives`, `/api/leaderboard`, `/api/trends`)
 
 ## Production
 
@@ -37,6 +37,7 @@ Serves the Vite `dist/` build and `/api/*` from one Node process (`PORT`, defaul
 |----------|---------|---------|
 | `PORT` | `3001` | HTTP port |
 | `CACHE_TTL_MS` | `300000` (5 min) | Observation/metrics cache TTL |
+| `SQLITE_PATH` | `data/wildwatchboard.sqlite` | SQLite database file |
 | `INAT_USER_AGENT` | WildWatchBoard/… | Identify the app to iNaturalist |
 
 ## Region snapshot metrics
@@ -49,15 +50,19 @@ Over the last **30 days** (pagination capped):
 
 ## Invasive species watch
 
-Flags configured high-priority invasives from `server/config/target_species.json` (Nutria, Yellow Starthistle, Tree of Heaven, Water Hyacinth) within the same observation window. Species with sightings are highlighted; clear species still appear so the watch list is visible.
+Flags configured high-priority invasives from `server/config/target_species.json` (Nutria, Yellow Starthistle, Tree of Heaven, Water Hyacinth). Each species shows **Now vs Prior** counts for the shared 7 / 30 / 90 day window (equal page budgets per period, same fairness rule as trends). Species with current sightings are highlighted; clear species still appear so the watch list is visible.
 
-API: `GET /api/invasives?region=tri-valley`
+API: `GET /api/invasives?region=tri-valley&window=30`
 
 ## Community leaderboard
 
 Ranks top contributors by observation count. Shows the top 10 (about 5 visible, scroll for the rest).
 
-A shared **7 / 30 / 360** day toggle drives snapshot, invasives, leaderboard, and map together (`?window=` on those API routes).
+A shared **7 / 30 / 90** day toggle drives snapshot, trends, invasives, leaderboard, and map together (`?window=` on those API routes).
+
+## Comparable trends
+
+`GET /api/trends` compares current vs previous windows for **7d, 30d, and 90d** (equal page budgets per period so Now is not inflated vs Prior). Observations are upserted into SQLite; dashboard responses reuse the exact last fetch payload.
 
 ## Adding a region
 

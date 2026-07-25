@@ -6,8 +6,13 @@ import type {
   InvasiveSpeciesConfig,
   InvasivesDto,
   ObservationDto,
+  ObservationWindowDays,
 } from '../../shared/types.ts'
-import { getObservationsForRegion } from './inaturalist.ts'
+import { isoDateDaysAgo } from '../db/sqlite.ts'
+import {
+  getObservationsForDateRange,
+  getObservationsForRegion,
+} from './inaturalist.ts'
 import {
   observationQueryOptions,
   parseObservationWindow,
@@ -59,27 +64,34 @@ function latestDate(dates: Array<string | null>): string | null {
   return valid.length ? valid[valid.length - 1]! : null
 }
 
-export async function getInvasivesForRegion(
-  regionId?: string,
-  windowDaysRaw: unknown = 30,
-): Promise<InvasivesDto> {
-  const targets = loadTargetSpecies()
-  const windowDays = parseObservationWindow(windowDaysRaw)
-  const { observations, cachedAt, region } = await getObservationsForRegion(
-    regionId,
-    observationQueryOptions(regionId, windowDays),
-  )
+function pctChange(current: number, previous: number): number | null {
+  if (previous === 0) return current === 0 ? 0 : null
+  return Math.round(((current - previous) / previous) * 1000) / 10
+}
 
+function buildAlerts(
+  targets: InvasiveSpeciesConfig[],
+  currentObs: ObservationDto[],
+  priorObs: ObservationDto[],
+  priorAvailable: boolean,
+): InvasiveSpeciesAlert[] {
   const alerts: InvasiveSpeciesAlert[] = targets.map((species) => {
-    const hits = observations
+    const hits = currentObs
       .filter((obs) => matchesInvasive(obs, species))
       .sort((a, b) => (b.observedOn || '').localeCompare(a.observedOn || ''))
+    const priorHits = priorObs.filter((obs) => matchesInvasive(obs, species))
+    const observationCount = hits.length
+    const previousObservationCount = priorAvailable ? priorHits.length : 0
 
     return {
       commonName: species.commonName,
       scientificName: species.scientificName,
       taxonId: species.taxonId,
-      observationCount: hits.length,
+      observationCount,
+      previousObservationCount,
+      observationCountPct: priorAvailable
+        ? pctChange(observationCount, previousObservationCount)
+        : null,
       latestObservedOn: latestDate(hits.map((h) => h.observedOn)),
       observations: hits.slice(0, 8),
     }
@@ -92,11 +104,59 @@ export async function getInvasivesForRegion(
     return a.commonName.localeCompare(b.commonName)
   })
 
-  return {
-    region: region.id,
+  return alerts
+}
+
+export async function getInvasivesForRegion(
+  regionId?: string,
+  windowDaysRaw: unknown = 30,
+): Promise<InvasivesDto> {
+  const targets = loadTargetSpecies()
+  const windowDays = parseObservationWindow(windowDaysRaw) as ObservationWindowDays
+  const { maxPages } = observationQueryOptions(regionId, windowDays)
+
+  const currentFetch = await getObservationsForRegion(regionId, {
     windowDays,
-    cachedAt,
-    totalInvasiveObservations: alerts.reduce((sum, a) => sum + a.observationCount, 0),
+    maxPages,
+  })
+
+  // Equal page budget for prior window — same fairness rule as trends.
+  const currentStart = isoDateDaysAgo(windowDays)
+  const priorStart = isoDateDaysAgo(windowDays * 2)
+  const priorEndDate = new Date(`${currentStart}T00:00:00.000Z`)
+  priorEndDate.setUTCDate(priorEndDate.getUTCDate() - 1)
+  const priorEnd = priorEndDate.toISOString().slice(0, 10)
+
+  const priorFetch = await getObservationsForDateRange(
+    regionId,
+    priorStart,
+    priorEnd,
+    maxPages,
+  )
+
+  const alerts = buildAlerts(
+    targets,
+    currentFetch.observations,
+    priorFetch.observations,
+    true,
+  )
+  const totalInvasiveObservations = alerts.reduce((sum, a) => sum + a.observationCount, 0)
+  const previousTotalInvasiveObservations = alerts.reduce(
+    (sum, a) => sum + a.previousObservationCount,
+    0,
+  )
+
+  return {
+    region: currentFetch.region.id,
+    windowDays,
+    cachedAt: currentFetch.cachedAt,
+    priorAvailable: true,
+    totalInvasiveObservations,
+    previousTotalInvasiveObservations,
+    totalInvasiveObservationsPct: pctChange(
+      totalInvasiveObservations,
+      previousTotalInvasiveObservations,
+    ),
     alerts,
   }
 }
