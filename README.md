@@ -40,6 +40,27 @@ Serves the Vite `dist/` build and `/api/*` from one Node process (`PORT`, defaul
 | `SQLITE_PATH` | `data/wildwatchboard.sqlite` | SQLite database file |
 | `INAT_USER_AGENT` | WildWatchBoard/… | Identify the app to iNaturalist |
 
+### Deploy on Fly.io
+
+This app runs as one Node process with SQLite on a persistent volume. Do **not** attach Fly Postgres.
+
+1. Install the [Fly CLI](https://fly.io/docs/flyctl/install/) and sign in (`fly auth login`).
+2. From the repo root (with `Dockerfile` + `fly.toml` on `main`):
+
+```bash
+fly launch --copy-config --no-deploy
+fly volumes create wildwatch_data --region sjc --size 1
+fly deploy
+```
+
+If the app already exists and GitHub is linked, create the **`wildwatch_data`** volume in **`sjc`** (1 GB), then deploy from GitHub or run `fly deploy`.
+
+- Region: **`sjc`** (San Jose)
+- Volume mount: `/data` → `SQLITE_PATH=/data/wildwatchboard.sqlite`
+- Health check: `https://<app>.fly.dev/api/health`
+
+If `wildwatchboard` is taken, change `app` in `fly.toml` before launch.
+
 ## Region snapshot metrics
 
 Over the last **30 days** (pagination capped):
