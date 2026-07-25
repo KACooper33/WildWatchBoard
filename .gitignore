@@ -30,3 +30,8 @@ dist-ssr
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Local SQLite
+/data/
+*.sqlite
+*.sqlite-*

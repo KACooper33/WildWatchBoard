@@ -46,19 +46,24 @@ export interface InvasiveSpeciesAlert {
   scientificName: string
   taxonId: number
   observationCount: number
+  previousObservationCount: number
+  observationCountPct: number | null
   latestObservedOn: string | null
   observations: ObservationDto[]
 }
 
 export interface InvasivesDto {
   region: string
-  windowDays: number
+  windowDays: ObservationWindowDays
   cachedAt: string | null
+  priorAvailable: boolean
   totalInvasiveObservations: number
+  previousTotalInvasiveObservations: number
+  totalInvasiveObservationsPct: number | null
   alerts: InvasiveSpeciesAlert[]
 }
 
-export type ObservationWindowDays = 7 | 30 | 360
+export type ObservationWindowDays = 7 | 30 | 90
 
 /** @deprecated Use ObservationWindowDays */
 export type LeaderboardWindowDays = ObservationWindowDays
@@ -77,6 +82,31 @@ export interface LeaderboardDto {
   cachedAt: string | null
   observationSampleSize: number
   entries: LeaderboardEntry[]
+}
+
+export interface TrendPeriodMetrics {
+  observationCount: number
+  uniqueSpecies: number
+  observerCount: number
+  researchGradePercent: number
+  invasiveCount: number
+}
+
+export interface TrendsDto {
+  region: string
+  windowDays: ObservationWindowDays
+  cachedAt: string | null
+  /** False only if a prior window cannot be fetched fairly. */
+  priorAvailable: boolean
+  current: TrendPeriodMetrics
+  previous: TrendPeriodMetrics
+  deltas: {
+    observationCountPct: number | null
+    uniqueSpeciesPct: number | null
+    observerCountPct: number | null
+    researchGradePercentPts: number | null
+    invasiveCountPct: number | null
+  }
 }
 
 export const ICONIC_TAXON_COLORS: Record<string, string> = {

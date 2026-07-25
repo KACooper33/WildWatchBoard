@@ -1,5 +1,15 @@
-import type { ObservationDto, QualityGrade } from '../../shared/types.ts'
+import type { ObservationDto } from '../../shared/types.ts'
 import { getRegion, isPointInRegion, type RegionConfig } from './geoFilter.ts'
+import {
+  getFetchMeta,
+  isoDateDaysAgo,
+  isoDateToday,
+  loadFetchResult,
+  queryObservationsByDateRange,
+  saveFetchResult,
+  upsertFetchMeta,
+  upsertObservations,
+} from '../db/sqlite.ts'
 
 const INAT_BASE = 'https://api.inaturalist.org/v1/observations'
 const USER_AGENT =
@@ -81,7 +91,7 @@ function parseCoords(raw: InatObservation): { lat: number | null; lng: number | 
   return { lat: null, lng: null }
 }
 
-function normalizeQuality(grade?: string): QualityGrade {
+function normalizeQuality(grade?: string): ObservationDto['qualityGrade'] {
   if (grade === 'research' || grade === 'needs_id' || grade === 'casual') {
     return grade
   }
@@ -138,6 +148,7 @@ async function fetchPage(
   region: RegionConfig,
   page: number,
   d1: string,
+  d2?: string,
 ): Promise<InatObservation[]> {
   const params = new URLSearchParams({
     nelat: String(region.bbox.nelat),
@@ -150,6 +161,7 @@ async function fetchPage(
     order: 'desc',
     order_by: 'observed_on',
   })
+  if (d2) params.set('d2', d2)
 
   const response = await fetch(`${INAT_BASE}?${params}`, {
     headers: {
@@ -166,18 +178,12 @@ async function fetchPage(
   return data.results ?? []
 }
 
-function windowStartDate(windowDays: number): string {
-  const d = new Date()
-  d.setUTCDate(d.getUTCDate() - windowDays)
-  return d.toISOString().slice(0, 10)
-}
-
-async function fetchAndFilter(
+async function fetchAndFilterRange(
   region: RegionConfig,
-  windowDays: number,
+  d1: string,
+  d2: string | undefined,
   maxPages: number,
 ): Promise<ObservationDto[]> {
-  const d1 = windowStartDate(windowDays)
   const all: ObservationDto[] = []
 
   for (let page = 1; page <= maxPages; page += 1) {
@@ -185,13 +191,11 @@ async function fetchAndFilter(
       await sleep(PAGE_DELAY_MS)
     }
 
-    const results = await fetchPage(region, page, d1)
+    const results = await fetchPage(region, page, d1, d2)
     if (results.length === 0) break
 
     for (const raw of results) {
       const dto = transformObservation(raw)
-      // Keep observations even without coords for metrics; map skips them.
-      // For PIP: if coords exist, must be inside polygon; if missing, keep for metrics only.
       if (dto.lat != null && dto.lng != null) {
         if (!isPointInRegion(region, dto.lat, dto.lng)) continue
       }
@@ -204,6 +208,36 @@ async function fetchAndFilter(
   return all
 }
 
+async function fetchAndFilter(
+  region: RegionConfig,
+  windowDays: number,
+  maxPages: number,
+): Promise<ObservationDto[]> {
+  return fetchAndFilterRange(region, isoDateDaysAgo(windowDays), isoDateToday(), maxPages)
+}
+
+function persistFetch(
+  cacheKey: string,
+  regionId: string,
+  windowDays: number,
+  maxPages: number,
+  observations: ObservationDto[],
+): string {
+  const fetchedAt = new Date().toISOString()
+  const expiresAt = new Date(Date.now() + DEFAULT_CACHE_TTL_MS).toISOString()
+  upsertObservations(regionId, observations)
+  upsertFetchMeta({
+    cacheKey,
+    regionId,
+    windowDays,
+    maxPages,
+    fetchedAt,
+    expiresAt,
+  })
+  saveFetchResult(cacheKey, observations, fetchedAt, expiresAt)
+  return fetchedAt
+}
+
 export interface ObservationQueryOptions {
   windowDays?: number
   maxPages?: number
@@ -212,7 +246,12 @@ export interface ObservationQueryOptions {
 export async function getObservationsForRegion(
   regionId?: string,
   options: ObservationQueryOptions = {},
-): Promise<{ observations: ObservationDto[]; cachedAt: string; region: RegionConfig; windowDays: number }> {
+): Promise<{
+  observations: ObservationDto[]
+  cachedAt: string
+  region: RegionConfig
+  windowDays: number
+}> {
   const region = getRegion(regionId)
   const windowDays = options.windowDays ?? region.windowDays
   const maxPages = options.maxPages ?? region.maxPages
@@ -224,11 +263,37 @@ export async function getObservationsForRegion(
     return { observations: hit.value, cachedAt: hit.cachedAt, region, windowDays }
   }
 
+  const stored = loadFetchResult(cacheKey)
+  const meta = getFetchMeta(cacheKey)
+  if (
+    stored &&
+    meta &&
+    Date.parse(stored.expiresAt) > now &&
+    Date.parse(meta.expiresAt) > now
+  ) {
+    observationCache.set(cacheKey, {
+      value: stored.observations,
+      cachedAt: stored.fetchedAt,
+      expiresAt: Date.parse(stored.expiresAt),
+    })
+    return {
+      observations: stored.observations,
+      cachedAt: stored.fetchedAt,
+      region,
+      windowDays,
+    }
+  }
+
   let pending = inflight.get(cacheKey)
   if (!pending) {
-    pending = fetchAndFilter(region, windowDays, maxPages).finally(() => {
-      inflight.delete(cacheKey)
-    })
+    pending = fetchAndFilter(region, windowDays, maxPages)
+      .then((observations) => {
+        persistFetch(cacheKey, region.id, windowDays, maxPages, observations)
+        return observations
+      })
+      .finally(() => {
+        inflight.delete(cacheKey)
+      })
     inflight.set(cacheKey, pending)
   }
 
@@ -243,6 +308,68 @@ export async function getObservationsForRegion(
   return { observations, cachedAt, region, windowDays }
 }
 
+/**
+ * Fetch a closed date range with the same page budget as other dashboard pulls.
+ * Used for fair current-vs-prior trend comparisons.
+ */
+export async function getObservationsForDateRange(
+  regionId: string | undefined,
+  startDate: string,
+  endDate: string,
+  maxPages?: number,
+): Promise<{ observations: ObservationDto[]; cachedAt: string; region: RegionConfig }> {
+  const region = getRegion(regionId)
+  const pages = maxPages ?? region.maxPages
+  const cacheKey = `${region.id}:range:${startDate}:${endDate}:${pages}`
+  const now = Date.now()
+  const hit = observationCache.get(cacheKey)
+
+  if (hit && hit.expiresAt > now) {
+    return { observations: hit.value, cachedAt: hit.cachedAt, region }
+  }
+
+  const stored = loadFetchResult(cacheKey)
+  if (stored && Date.parse(stored.expiresAt) > now) {
+    observationCache.set(cacheKey, {
+      value: stored.observations,
+      cachedAt: stored.fetchedAt,
+      expiresAt: Date.parse(stored.expiresAt),
+    })
+    return { observations: stored.observations, cachedAt: stored.fetchedAt, region }
+  }
+
+  let pending = inflight.get(cacheKey)
+  if (!pending) {
+    pending = fetchAndFilterRange(region, startDate, endDate, pages)
+      .then((observations) => {
+        persistFetch(cacheKey, region.id, 0, pages, observations)
+        return observations
+      })
+      .finally(() => {
+        inflight.delete(cacheKey)
+      })
+    inflight.set(cacheKey, pending)
+  }
+
+  const observations = await pending
+  const cachedAt = new Date().toISOString()
+  observationCache.set(cacheKey, {
+    value: observations,
+    expiresAt: now + DEFAULT_CACHE_TTL_MS,
+    cachedAt,
+  })
+
+  return { observations, cachedAt, region }
+}
+
 export function getCacheTtlMs(): number {
   return DEFAULT_CACHE_TTL_MS
+}
+
+export function getObservationsInRange(
+  regionId: string,
+  startDate: string,
+  endDate: string,
+): ObservationDto[] {
+  return queryObservationsByDateRange(regionId, startDate, endDate)
 }

@@ -6,11 +6,13 @@ import { Leaderboard } from './components/Leaderboard'
 import { ObservationMap } from './components/ObservationMap'
 import { RegionSnapshot } from './components/RegionSnapshot'
 import { TimeWindowToggle } from './components/TimeWindowToggle'
+import { TrendsPanel } from './components/TrendsPanel'
 import { useInvasives } from './hooks/useInvasives'
 import { useLeaderboard } from './hooks/useLeaderboard'
 import { useMetrics } from './hooks/useMetrics'
 import { useObservations } from './hooks/useObservations'
 import { useRegions } from './hooks/useRegions'
+import { useTrends } from './hooks/useTrends'
 
 const DEFAULT_REGION = 'tri-valley'
 
@@ -31,6 +33,7 @@ export default function App() {
   const observationsQuery = useObservations(regionId, windowDays)
   const invasivesQuery = useInvasives(regionId, windowDays)
   const leaderboardQuery = useLeaderboard(regionId, windowDays)
+  const trendsQuery = useTrends(regionId, windowDays)
 
   return (
     <div className="min-h-dvh">
@@ -45,6 +48,11 @@ export default function App() {
           metrics={metricsQuery.data}
           isLoading={metricsQuery.isLoading}
           error={metricsQuery.error}
+        />
+        <TrendsPanel
+          data={trendsQuery.data}
+          isLoading={trendsQuery.isLoading}
+          error={trendsQuery.error}
         />
         <InvasiveWatch
           data={invasivesQuery.data}

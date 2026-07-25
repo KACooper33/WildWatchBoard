@@ -5,7 +5,7 @@ interface TimeWindowToggleProps {
   onChange: (windowDays: ObservationWindowDays) => void
 }
 
-const WINDOWS: ObservationWindowDays[] = [7, 30, 360]
+const WINDOWS: ObservationWindowDays[] = [7, 30, 90]
 
 export function TimeWindowToggle({ windowDays, onChange }: TimeWindowToggleProps) {
   return (
@@ -16,7 +16,7 @@ export function TimeWindowToggle({ windowDays, onChange }: TimeWindowToggleProps
       <div>
         <p className="text-sm font-semibold text-[var(--color-ink)]">Time window</p>
         <p className="text-xs text-[var(--color-ink-muted)]">
-          Applies to snapshot, invasives, leaderboard, and map
+          Applies to snapshot, trends, invasives, leaderboard, and map
         </p>
       </div>
       <div

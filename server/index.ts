@@ -6,10 +6,15 @@ import { observationsRouter } from './routes/observations.ts'
 import { regionsRouter } from './routes/regions.ts'
 import { invasivesRouter } from './routes/invasives.ts'
 import { leaderboardRouter } from './routes/leaderboard.ts'
+import { trendsRouter } from './routes/trends.ts'
+import { getDb, getDbPath } from './db/sqlite.ts'
 
 const app = express()
 const PORT = Number(process.env.PORT || 3001)
 const isProd = process.env.NODE_ENV === 'production'
+
+// Initialize SQLite on boot
+getDb()
 
 app.use((_req, res, next) => {
   res.setHeader('X-WildWatchBoard', 'api')
@@ -17,7 +22,7 @@ app.use((_req, res, next) => {
 })
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'wildwatchboard' })
+  res.json({ ok: true, service: 'wildwatchboard', sqlitePath: getDbPath() })
 })
 
 app.use('/api/regions', regionsRouter)
@@ -25,6 +30,7 @@ app.use('/api/observations', observationsRouter)
 app.use('/api/metrics', metricsRouter)
 app.use('/api/invasives', invasivesRouter)
 app.use('/api/leaderboard', leaderboardRouter)
+app.use('/api/trends', trendsRouter)
 
 const dataDir = join(process.cwd(), 'public', 'data')
 if (existsSync(dataDir)) {
