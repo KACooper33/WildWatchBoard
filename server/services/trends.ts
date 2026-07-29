@@ -10,9 +10,9 @@ import {
   queryYearlySeries,
 } from '../db/analytics.ts'
 import { isoDateDaysAgo, isoDateToday } from '../db/sqlite.ts'
-import { ARCHIVE_YEARS_BACK, ensureRegionCoverage } from './archive.ts'
+import { ARCHIVE_YEARS_BACK, scheduleRegionBackfill } from './archive.ts'
 import { getRegion } from './geoFilter.ts'
-import { parseObservationWindow } from './timeWindow.ts'
+import { parseObservationWindow, parseTaxaFilter } from './timeWindow.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -58,13 +58,15 @@ function pctChange(current: number, previous: number): number | null {
 export async function getTrendsForRegion(
   regionId: string | undefined,
   windowDaysRaw: unknown,
+  taxaRaw: unknown = undefined,
 ): Promise<TrendsDto> {
   const windowDays = parseObservationWindow(windowDaysRaw) as ObservationWindowDays
+  const appliedTaxa = parseTaxaFilter(taxaRaw)
   const region = getRegion(regionId)
   const priorAvailable = windowDays <= MAX_TREND_COMPARE_WINDOW
   const invasiveTaxonIds = loadInvasives().map((s) => s.taxonId)
 
-  const backfillStatus = await ensureRegionCoverage(region.id, ARCHIVE_YEARS_BACK)
+  const backfillStatus = scheduleRegionBackfill(region.id, ARCHIVE_YEARS_BACK)
 
   const currentEnd = isoDateToday()
   const currentStart = isoDateDaysAgo(windowDays)
@@ -73,13 +75,19 @@ export async function getTrendsForRegion(
     currentStart,
     currentEnd,
     invasiveTaxonIds,
+    appliedTaxa,
   )
 
   const now = new Date()
   const endYear = now.getUTCFullYear()
   const startYear = endYear - ARCHIVE_YEARS_BACK
-  const yearly = queryYearlySeries(region.id, startYear, endYear)
-  const monthly = queryMonthlySeries(region.id, endYear)
+  const yearlyAll = queryYearlySeries(region.id, startYear, endYear, [])
+  const yearly =
+    appliedTaxa.length === 0
+      ? yearlyAll
+      : queryYearlySeries(region.id, startYear, endYear, appliedTaxa)
+  const yearlyScaleMax = Math.max(1, ...yearlyAll.map((y) => y.observationCount))
+  const monthly = queryMonthlySeries(region.id, endYear, appliedTaxa)
 
   if (!priorAvailable) {
     return {
@@ -87,6 +95,7 @@ export async function getTrendsForRegion(
       windowDays,
       cachedAt: new Date().toISOString(),
       priorAvailable: false,
+      appliedTaxa,
       current,
       previous: emptyPeriod(),
       deltas: {
@@ -97,6 +106,7 @@ export async function getTrendsForRegion(
         invasiveCountPct: null,
       },
       yearly,
+      yearlyScaleMax,
       monthly,
       backfillStatus,
     }
@@ -112,6 +122,7 @@ export async function getTrendsForRegion(
     priorStart,
     priorEnd,
     invasiveTaxonIds,
+    appliedTaxa,
   )
 
   return {
@@ -119,6 +130,7 @@ export async function getTrendsForRegion(
     windowDays,
     cachedAt: new Date().toISOString(),
     priorAvailable: true,
+    appliedTaxa,
     current,
     previous,
     deltas: {
@@ -130,6 +142,7 @@ export async function getTrendsForRegion(
       invasiveCountPct: pctChange(current.invasiveCount, previous.invasiveCount),
     },
     yearly,
+    yearlyScaleMax,
     monthly,
     backfillStatus,
   }

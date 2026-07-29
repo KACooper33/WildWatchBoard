@@ -6,7 +6,11 @@ export const metricsRouter = Router()
 metricsRouter.get('/', async (req, res) => {
   try {
     const regionId = typeof req.query.region === 'string' ? req.query.region : undefined
-    const metrics = await getMetricsForRegion(regionId, req.query.window ?? 30)
+    const metrics = await getMetricsForRegion(
+      regionId,
+      req.query.window ?? 30,
+      req.query.taxa,
+    )
     res.json(metrics)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load metrics'
