@@ -1,4 +1,4 @@
-import type { TrendsDto } from '../../shared/types'
+import type { TrendsDto, YearlyTrendPoint } from '../../shared/types'
 
 interface TrendsPanelProps {
   data?: TrendsDto
@@ -40,26 +40,75 @@ function TrendRow({
     <div
       className={
         showPrior
-          ? 'grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 border-b border-[var(--color-border)] py-2.5 last:border-b-0 sm:gap-4'
-          : 'grid grid-cols-[1fr_auto] items-baseline gap-2 border-b border-[var(--color-border)] py-2.5 last:border-b-0 sm:gap-4'
+          ? 'grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem_3.5rem] items-baseline gap-2 border-b border-[var(--color-border)] py-2.5 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem] sm:gap-4'
+          : 'grid grid-cols-[minmax(0,1fr)_3.5rem] items-baseline gap-2 border-b border-[var(--color-border)] py-2.5 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_4rem] sm:gap-4'
       }
     >
       <p className="text-sm text-[var(--color-ink)]">{label}</p>
-      <p className="min-w-14 text-right font-semibold tabular-nums">
+      <p className="text-right font-semibold tabular-nums">
         {current}
         {suffix}
       </p>
       {showPrior ? (
         <>
-          <p className="min-w-14 text-right text-sm tabular-nums text-[var(--color-ink-muted)]">
+          <p className="text-right text-sm tabular-nums text-[var(--color-ink-muted)]">
             {previous}
             {suffix}
           </p>
-          <p className={`min-w-14 text-right text-sm font-semibold tabular-nums ${d.className}`}>
+          <p className={`text-right text-sm font-semibold tabular-nums ${d.className}`}>
             {d.text}
           </p>
         </>
       ) : null}
+    </div>
+  )
+}
+
+function YearlyBars({
+  yearly,
+  yearsBack,
+}: {
+  yearly: YearlyTrendPoint[]
+  yearsBack: number
+}) {
+  const max = Math.max(1, ...yearly.map((y) => y.observationCount))
+  const title = `${yearsBack}-year history`
+
+  return (
+    <div className="mt-5" data-testid="yearly-history">
+      <div className="mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+          {title}
+        </p>
+        <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+          Observations by year from the local SQL archive
+        </p>
+      </div>
+      <ul className="space-y-2">
+        {yearly.map((point) => {
+          const widthPct = Math.max(2, Math.round((point.observationCount / max) * 100))
+          return (
+            <li key={point.year} className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-2">
+              <span className="text-sm tabular-nums text-[var(--color-ink)]">{point.year}</span>
+              <div className="h-3 overflow-hidden rounded bg-[var(--color-bg-deep)]">
+                <div
+                  className={
+                    point.isPartial
+                      ? 'h-full rounded bg-[var(--color-accent)]/55'
+                      : 'h-full rounded bg-[var(--color-accent)]'
+                  }
+                  style={{ width: `${widthPct}%` }}
+                  title={`${point.observationCount} observations`}
+                />
+              </div>
+              <span className="min-w-16 text-right text-sm tabular-nums text-[var(--color-ink-muted)]">
+                {point.observationCount.toLocaleString()}
+                {point.isPartial ? ' YTD' : ''}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
@@ -82,6 +131,8 @@ export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
   }
 
   const showPrior = data.priorAvailable
+  const backfill = data.backfillStatus
+  const building = backfill && !backfill.complete
 
   return (
     <section
@@ -96,8 +147,24 @@ export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
           {showPrior
             ? `Current ${data.windowDays} days vs previous ${data.windowDays} days`
             : `Last ${data.windowDays} days`}
+          {` · last ${backfill?.yearsBack ?? 5} years archived`}
         </p>
       </div>
+
+      {building ? (
+        <p
+          className="mb-3 flex items-center gap-2 rounded-xl border border-[var(--color-accent)]/25 bg-[var(--color-accent)]/8 px-3 py-2 text-xs text-[var(--color-ink)]"
+          data-testid="archive-backfill-status"
+          aria-live="polite"
+        >
+          <span
+            className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent"
+            aria-hidden
+          />
+          Building history… {backfill.completeMonths}/{backfill.requiredMonths} months
+          archived. Page loads only fetch missing months.
+        </p>
+      ) : null}
 
       {!showPrior ? (
         <p className="mb-3 rounded-xl border border-[var(--color-border)] bg-white/60 px-3 py-2 text-xs text-[var(--color-ink-muted)]">
@@ -105,24 +172,24 @@ export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
         </p>
       ) : null}
 
-      <div
-        className={
-          showPrior
-            ? 'mb-1 grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] sm:gap-4'
-            : 'mb-1 grid grid-cols-[1fr_auto] gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] sm:gap-4'
-        }
-      >
-        <span>Metric</span>
-        <span className="min-w-14 text-right">Now</span>
-        {showPrior ? (
-          <>
-            <span className="min-w-14 text-right">Prior</span>
-            <span className="min-w-14 text-right">Δ</span>
-          </>
-        ) : null}
-      </div>
-
       <div className="rounded-xl border border-[var(--color-border)] bg-white/60 px-3 sm:px-4">
+        <div
+          className={
+            showPrior
+              ? 'grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem_3.5rem] gap-2 border-b border-[var(--color-border)] py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem] sm:gap-4'
+              : 'grid grid-cols-[minmax(0,1fr)_3.5rem] gap-2 border-b border-[var(--color-border)] py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] sm:grid-cols-[minmax(0,1fr)_4rem] sm:gap-4'
+          }
+        >
+          <span>Metric</span>
+          <span className="text-right">Now</span>
+          {showPrior ? (
+            <>
+              <span className="text-right">Prior</span>
+              <span className="text-right">Δ</span>
+            </>
+          ) : null}
+        </div>
+
         <TrendRow
           label="Observations"
           current={data.current.observationCount}
@@ -161,6 +228,10 @@ export function TrendsPanel({ data, isLoading, error }: TrendsPanelProps) {
           showPrior={showPrior}
         />
       </div>
+
+      {data.yearly.length > 0 ? (
+        <YearlyBars yearly={data.yearly} yearsBack={backfill?.yearsBack ?? 5} />
+      ) : null}
     </section>
   )
 }

@@ -67,6 +67,8 @@ export default function App() {
         <ObservationMap
           observations={observationsQuery.data?.observations ?? []}
           isLoading={observationsQuery.isLoading}
+          mapLimit={observationsQuery.data?.limit}
+          capped={observationsQuery.data?.capped}
         />
 
         <footer className="pb-6 text-center text-xs text-[var(--color-ink-muted)]">

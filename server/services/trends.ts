@@ -1,21 +1,21 @@
 import type {
-  ObservationDto,
+  InvasiveSpeciesConfig,
   ObservationWindowDays,
   TrendPeriodMetrics,
   TrendsDto,
 } from '../../shared/types.ts'
-import { getRegion } from './geoFilter.ts'
 import {
-  getObservationsForDateRange,
-  getObservationsForRegion,
-} from './inaturalist.ts'
-import { computeMetrics } from './metrics.ts'
-import { isoDateDaysAgo } from '../db/sqlite.ts'
-import { observationQueryOptions, parseObservationWindow } from './timeWindow.ts'
+  queryMonthlySeries,
+  queryPeriodMetrics,
+  queryYearlySeries,
+} from '../db/analytics.ts'
+import { isoDateDaysAgo, isoDateToday } from '../db/sqlite.ts'
+import { ARCHIVE_YEARS_BACK, ensureRegionCoverage } from './archive.ts'
+import { getRegion } from './geoFilter.ts'
+import { parseObservationWindow } from './timeWindow.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { InvasiveSpeciesConfig } from '../../shared/types.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -40,16 +40,6 @@ function loadInvasives(): InvasiveSpeciesConfig[] {
   return []
 }
 
-function matchesInvasive(obs: ObservationDto, species: InvasiveSpeciesConfig): boolean {
-  if (obs.taxonId != null && obs.taxonId === species.taxonId) return true
-  const scientific = obs.scientificName?.trim().toLowerCase()
-  const target = species.scientificName.trim().toLowerCase()
-  if (scientific && (scientific === target || scientific.startsWith(`${target} `))) {
-    return true
-  }
-  return obs.displayName.trim().toLowerCase() === species.commonName.trim().toLowerCase()
-}
-
 function emptyPeriod(): TrendPeriodMetrics {
   return {
     observationCount: 0,
@@ -57,26 +47,6 @@ function emptyPeriod(): TrendPeriodMetrics {
     observerCount: 0,
     researchGradePercent: 0,
     invasiveCount: 0,
-  }
-}
-
-function toPeriodMetrics(
-  regionId: string,
-  windowDays: number,
-  observations: ObservationDto[],
-  invasives: InvasiveSpeciesConfig[],
-): TrendPeriodMetrics {
-  const base = computeMetrics(regionId, windowDays, observations, null)
-  const invasiveCount = observations.filter((obs) =>
-    invasives.some((species) => matchesInvasive(obs, species)),
-  ).length
-
-  return {
-    observationCount: base.observationCount,
-    uniqueSpecies: base.uniqueSpecies,
-    observerCount: base.observerCount,
-    researchGradePercent: base.researchGradePercent,
-    invasiveCount,
   }
 }
 
@@ -92,26 +62,30 @@ export async function getTrendsForRegion(
   const windowDays = parseObservationWindow(windowDaysRaw) as ObservationWindowDays
   const region = getRegion(regionId)
   const priorAvailable = windowDays <= MAX_TREND_COMPARE_WINDOW
-  const maxPages = observationQueryOptions(regionId, windowDays).maxPages
-  const invasives = loadInvasives()
+  const invasiveTaxonIds = loadInvasives().map((s) => s.taxonId)
 
-  // Current period: same fetch the rest of the dashboard uses for this window.
-  const currentFetch = await getObservationsForRegion(regionId, {
-    windowDays,
-    maxPages,
-  })
-  const current = toPeriodMetrics(
+  const backfillStatus = await ensureRegionCoverage(region.id, ARCHIVE_YEARS_BACK)
+
+  const currentEnd = isoDateToday()
+  const currentStart = isoDateDaysAgo(windowDays)
+  const current = queryPeriodMetrics(
     region.id,
-    windowDays,
-    currentFetch.observations,
-    invasives,
+    currentStart,
+    currentEnd,
+    invasiveTaxonIds,
   )
+
+  const now = new Date()
+  const endYear = now.getUTCFullYear()
+  const startYear = endYear - ARCHIVE_YEARS_BACK
+  const yearly = queryYearlySeries(region.id, startYear, endYear)
+  const monthly = queryMonthlySeries(region.id, endYear)
 
   if (!priorAvailable) {
     return {
       region: region.id,
       windowDays,
-      cachedAt: currentFetch.cachedAt,
+      cachedAt: new Date().toISOString(),
       priorAvailable: false,
       current,
       previous: emptyPeriod(),
@@ -122,34 +96,28 @@ export async function getTrendsForRegion(
         researchGradePercentPts: null,
         invasiveCountPct: null,
       },
+      yearly,
+      monthly,
+      backfillStatus,
     }
   }
 
-  // Prior period: separate equal-budget pull for [now-2W, day before current).
-  // Avoids newest-first pagination stuffing almost everything into "Now".
-  const currentStart = isoDateDaysAgo(windowDays)
-  const priorStart = isoDateDaysAgo(windowDays * 2)
   const priorEndDate = new Date(`${currentStart}T00:00:00.000Z`)
   priorEndDate.setUTCDate(priorEndDate.getUTCDate() - 1)
   const priorEnd = priorEndDate.toISOString().slice(0, 10)
+  const priorStart = isoDateDaysAgo(windowDays * 2)
 
-  const priorFetch = await getObservationsForDateRange(
-    regionId,
+  const previous = queryPeriodMetrics(
+    region.id,
     priorStart,
     priorEnd,
-    maxPages,
-  )
-  const previous = toPeriodMetrics(
-    region.id,
-    windowDays,
-    priorFetch.observations,
-    invasives,
+    invasiveTaxonIds,
   )
 
   return {
     region: region.id,
     windowDays,
-    cachedAt: currentFetch.cachedAt,
+    cachedAt: new Date().toISOString(),
     priorAvailable: true,
     current,
     previous,
@@ -161,5 +129,8 @@ export async function getTrendsForRegion(
         Math.round((current.researchGradePercent - previous.researchGradePercent) * 10) / 10,
       invasiveCountPct: pctChange(current.invasiveCount, previous.invasiveCount),
     },
+    yearly,
+    monthly,
+    backfillStatus,
   }
 }
