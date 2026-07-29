@@ -35,6 +35,8 @@ export function fetchObservations(regionId: string, windowDays: ObservationWindo
     windowDays: number
     cachedAt: string
     count: number
+    limit: number
+    capped: boolean
     observations: ObservationDto[]
   }>(withWindow('/api/observations', regionId, windowDays))
 }

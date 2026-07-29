@@ -48,6 +48,15 @@ function migrate(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_observations_region_date
       ON observations (region_id, observed_on);
 
+    CREATE INDEX IF NOT EXISTS idx_observations_region_taxon_date
+      ON observations (region_id, iconic_taxon, observed_on);
+
+    CREATE INDEX IF NOT EXISTS idx_observations_region_observer
+      ON observations (region_id, observer_id);
+
+    CREATE INDEX IF NOT EXISTS idx_observations_region_taxon_id
+      ON observations (region_id, taxon_id);
+
     CREATE TABLE IF NOT EXISTS fetch_meta (
       cache_key TEXT PRIMARY KEY,
       region_id TEXT NOT NULL,
@@ -63,8 +72,21 @@ function migrate(database: Database.Database): void {
       fetched_at TEXT NOT NULL,
       expires_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS coverage_months (
+      region_id TEXT NOT NULL,
+      year_month TEXT NOT NULL,
+      status TEXT NOT NULL,
+      fetched_at TEXT NOT NULL,
+      observation_count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (region_id, year_month)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_coverage_region_status
+      ON coverage_months (region_id, status);
   `)
 }
+
 export interface FetchMeta {
   cacheKey: string
   regionId: string
@@ -262,4 +284,139 @@ export function isoDateDaysAgo(days: number): string {
 
 export function isoDateToday(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+export type CoverageStatus = 'complete' | 'partial'
+
+export interface CoverageMonthRow {
+  regionId: string
+  yearMonth: string
+  status: CoverageStatus
+  fetchedAt: string
+  observationCount: number
+}
+
+/** Calendar months from (today - yearsBack) through the current month, inclusive. */
+export function listYearMonths(yearsBack: number): string[] {
+  const now = new Date()
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear() - yearsBack, now.getUTCMonth(), 1),
+  )
+  const months: string[] = []
+  const cursor = new Date(start)
+  while (cursor <= end) {
+    const y = cursor.getUTCFullYear()
+    const m = String(cursor.getUTCMonth() + 1).padStart(2, '0')
+    months.push(`${y}-${m}`)
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+  }
+  return months
+}
+
+export function currentYearMonth(): string {
+  const now = new Date()
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+export function monthDateBounds(yearMonth: string): { startDate: string; endDate: string } {
+  const [yearStr, monthStr] = yearMonth.split('-')
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const startDate = `${yearMonth}-01`
+  const end = new Date(Date.UTC(year, month, 0))
+  const endDate = end.toISOString().slice(0, 10)
+  return { startDate, endDate }
+}
+
+export function getCoverageMonth(
+  regionId: string,
+  yearMonth: string,
+): CoverageMonthRow | null {
+  const row = getDb()
+    .prepare(
+      `SELECT region_id as regionId, year_month as yearMonth, status,
+              fetched_at as fetchedAt, observation_count as observationCount
+       FROM coverage_months
+       WHERE region_id = ? AND year_month = ?`,
+    )
+    .get(regionId, yearMonth) as CoverageMonthRow | undefined
+  return row ?? null
+}
+
+export function listCoverageMonths(regionId: string): CoverageMonthRow[] {
+  return getDb()
+    .prepare(
+      `SELECT region_id as regionId, year_month as yearMonth, status,
+              fetched_at as fetchedAt, observation_count as observationCount
+       FROM coverage_months
+       WHERE region_id = ?
+       ORDER BY year_month ASC`,
+    )
+    .all(regionId) as CoverageMonthRow[]
+}
+
+export function upsertCoverageMonth(row: CoverageMonthRow): void {
+  getDb()
+    .prepare(
+      `INSERT INTO coverage_months (
+         region_id, year_month, status, fetched_at, observation_count
+       ) VALUES (
+         @regionId, @yearMonth, @status, @fetchedAt, @observationCount
+       )
+       ON CONFLICT(region_id, year_month) DO UPDATE SET
+         status = excluded.status,
+         fetched_at = excluded.fetched_at,
+         observation_count = excluded.observation_count`,
+    )
+    .run(row)
+}
+
+export function countObservationsInMonth(regionId: string, yearMonth: string): number {
+  const { startDate, endDate } = monthDateBounds(yearMonth)
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM observations
+       WHERE region_id = ?
+         AND observed_on IS NOT NULL
+         AND observed_on >= ?
+         AND observed_on <= ?`,
+    )
+    .get(regionId, startDate, endDate) as { count: number }
+  return row.count
+}
+
+/** Load observations for map pins with an optional taxa filter and row cap. */
+export function queryObservationsForMap(
+  regionId: string,
+  startDate: string,
+  endDate: string,
+  limit = 500,
+  taxa: string[] = [],
+): ObservationDto[] {
+  const params: Array<string | number> = [regionId, startDate, endDate]
+  let taxaClause = ''
+  if (taxa.length > 0) {
+    taxaClause = `AND iconic_taxon IN (${taxa.map(() => '?').join(', ')})`
+    params.push(...taxa)
+  }
+  params.push(limit)
+
+  const rows = getDb()
+    .prepare(
+      `SELECT id, lat, lng, obscured, public_positional_accuracy, display_name, scientific_name,
+              taxon_id, iconic_taxon, quality_grade, observer, observer_id, observed_on, thumbnail_url
+       FROM observations
+       WHERE region_id = ?
+         AND observed_on IS NOT NULL
+         AND observed_on >= ?
+         AND observed_on <= ?
+         ${taxaClause}
+       ORDER BY observed_on DESC
+       LIMIT ?`,
+    )
+    .all(...params) as ObservationRow[]
+
+  return rows.map(rowToDto)
 }

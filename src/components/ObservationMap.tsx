@@ -15,6 +15,9 @@ import { ICONIC_TAXON_COLORS, ICONIC_TAXON_LABELS } from '../../shared/types'
 interface ObservationMapProps {
   observations: ObservationDto[]
   isLoading: boolean
+  /** Server pin limit (intentional performance cap). */
+  mapLimit?: number
+  capped?: boolean
 }
 
 const FALLBACK_CENTER: [number, number] = [37.68, -121.82]
@@ -101,7 +104,12 @@ function ObservationPopup({ obs }: { obs: ObservationDto }) {
   )
 }
 
-export function ObservationMap({ observations, isLoading }: ObservationMapProps) {
+export function ObservationMap({
+  observations,
+  isLoading,
+  mapLimit = 500,
+  capped = false,
+}: ObservationMapProps) {
   const [boundary, setBoundary] = useState<FeatureCollection | null>(null)
 
   useEffect(() => {
@@ -132,12 +140,22 @@ export function ObservationMap({ observations, isLoading }: ObservationMapProps)
       className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] shadow-sm"
       data-testid="observation-map"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)] px-4 py-3">
-        <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
-          Observations map
-        </h2>
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border)] px-4 py-3">
+        <div>
+          <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
+            Observations map
+          </h2>
+          <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+            Shows up to {mapLimit.toLocaleString()} most recent pins for performance; snapshot and
+            trends use the full archive.
+          </p>
+        </div>
         <p className="text-sm text-[var(--color-ink-muted)]">
-          {isLoading ? 'Loading…' : `${mappable.length} mapped`}
+          {isLoading
+            ? 'Loading…'
+            : capped
+              ? `${mappable.length.toLocaleString()} mapped (capped)`
+              : `${mappable.length.toLocaleString()} mapped`}
         </p>
       </div>
       <div className="h-[50vh] min-h-[280px] w-full sm:h-[min(62vh,640px)]">

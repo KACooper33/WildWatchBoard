@@ -1,9 +1,12 @@
 import { Router } from 'express'
-import { getObservationsForRegion } from '../services/inaturalist.ts'
-import {
-  observationQueryOptions,
-  parseObservationWindow,
-} from '../services/timeWindow.ts'
+import { queryObservationsForMap } from '../db/sqlite.ts'
+import { isoDateDaysAgo, isoDateToday } from '../db/sqlite.ts'
+import { ARCHIVE_YEARS_BACK, ensureRegionCoverage } from '../services/archive.ts'
+import { getRegion } from '../services/geoFilter.ts'
+import { parseObservationWindow } from '../services/timeWindow.ts'
+
+/** Intentional map pin cap — metrics/trends use the full SQL archive. */
+export const MAP_OBSERVATION_LIMIT = 500
 
 export const observationsRouter = Router()
 
@@ -11,15 +14,25 @@ observationsRouter.get('/', async (req, res) => {
   try {
     const regionId = typeof req.query.region === 'string' ? req.query.region : undefined
     const windowDays = parseObservationWindow(req.query.window ?? 30)
-    const { observations, cachedAt, region } = await getObservationsForRegion(
-      regionId,
-      observationQueryOptions(regionId, windowDays),
+    const region = getRegion(regionId)
+    await ensureRegionCoverage(region.id, ARCHIVE_YEARS_BACK)
+
+    const endDate = isoDateToday()
+    const startDate = isoDateDaysAgo(windowDays)
+    const observations = queryObservationsForMap(
+      region.id,
+      startDate,
+      endDate,
+      MAP_OBSERVATION_LIMIT,
     )
+
     res.json({
       region: region.id,
       windowDays,
-      cachedAt,
+      cachedAt: new Date().toISOString(),
       count: observations.length,
+      limit: MAP_OBSERVATION_LIMIT,
+      capped: observations.length >= MAP_OBSERVATION_LIMIT,
       observations,
     })
   } catch (error) {

@@ -8,6 +8,8 @@ import { invasivesRouter } from './routes/invasives.ts'
 import { leaderboardRouter } from './routes/leaderboard.ts'
 import { trendsRouter } from './routes/trends.ts'
 import { getDb, getDbPath } from './db/sqlite.ts'
+import { ARCHIVE_YEARS_BACK, getBackfillStatus } from './services/archive.ts'
+import { getRegion } from './services/geoFilter.ts'
 
 const app = express()
 const PORT = Number(process.env.PORT || 3001)
@@ -22,7 +24,13 @@ app.use((_req, res, next) => {
 })
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'wildwatchboard', sqlitePath: getDbPath() })
+  const region = getRegion()
+  res.json({
+    ok: true,
+    service: 'wildwatchboard',
+    sqlitePath: getDbPath(),
+    archive: getBackfillStatus(region.id, ARCHIVE_YEARS_BACK),
+  })
 })
 
 app.use('/api/regions', regionsRouter)

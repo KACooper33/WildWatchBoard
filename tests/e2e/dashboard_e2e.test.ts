@@ -17,6 +17,8 @@ const mockObservations = {
   windowDays: 30,
   cachedAt: '2026-07-23T00:00:00.000Z',
   count: 3,
+  limit: 500,
+  capped: false,
   observations: [
     {
       id: 1001,
@@ -198,6 +200,24 @@ const mockTrends = {
     researchGradePercentPts: 5,
     invasiveCountPct: -33.3,
   },
+  yearly: [
+    { year: 2022, observationCount: 4200, uniqueSpecies: 900, observerCount: 200, isPartial: false },
+    { year: 2023, observationCount: 5100, uniqueSpecies: 980, observerCount: 240, isPartial: false },
+    { year: 2024, observationCount: 6300, uniqueSpecies: 1100, observerCount: 280, isPartial: false },
+    { year: 2025, observationCount: 7000, uniqueSpecies: 1200, observerCount: 300, isPartial: false },
+    { year: 2026, observationCount: 2100, uniqueSpecies: 500, observerCount: 120, isPartial: true },
+  ],
+  monthly: [
+    { yearMonth: '2026-01', observationCount: 400, uniqueSpecies: 120, observerCount: 40 },
+    { yearMonth: '2026-06', observationCount: 500, uniqueSpecies: 140, observerCount: 50 },
+  ],
+  backfillStatus: {
+    yearsBack: 5,
+    requiredMonths: 60,
+    completeMonths: 60,
+    pendingMonths: 0,
+    complete: true,
+  },
 }
 
 test.beforeEach(async ({ page }) => {
@@ -256,6 +276,8 @@ test('dashboard loads brand, snapshot, trends, invasives, leaderboard, and map',
   await expect(page.getByTestId('region-snapshot').getByText('Unique species')).toBeVisible()
   await expect(page.getByTestId('trends-panel')).toBeVisible()
   await expect(page.getByText('Comparable trends')).toBeVisible()
+  await expect(page.getByTestId('yearly-history')).toBeVisible()
+  await expect(page.getByText(/year history/i)).toBeVisible()
   await expect(page.getByTestId('invasive-watch')).toBeVisible()
   await expect(page.getByText('Yellow Starthistle')).toBeVisible()
   await expect(page.getByTestId('leaderboard')).toBeVisible()

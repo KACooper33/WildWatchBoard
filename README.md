@@ -7,7 +7,7 @@ Data is sourced from the [iNaturalist API](https://api.inaturalist.org/v1/), fil
 ## Stack
 
 - React + TypeScript + Vite + Tailwind CSS
-- Express API (`server/`) with SQLite persistence + in-memory TTL cache + request throttle
+- Express API (`server/`) with SQLite archive, analytical SQL aggregations, and request throttle
 - React-Leaflet map
 - TanStack Query
 - Playwright e2e (mocked API)
@@ -36,8 +36,11 @@ Serves the Vite `dist/` build and `/api/*` from one Node process (`PORT`, defaul
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `3001` | HTTP port |
-| `CACHE_TTL_MS` | `300000` (5 min) | Observation/metrics cache TTL |
+| `CACHE_TTL_MS` | `300000` (5 min) | Current-month archive refresh TTL |
 | `SQLITE_PATH` | `data/wildwatchboard.sqlite` | SQLite database file |
+| `ARCHIVE_YEARS_BACK` | `5` | How many years of monthly history to keep |
+| `ARCHIVE_MONTHS_PER_CALL` | `3` | Missing months ingested per API request |
+| `ARCHIVE_MAX_PAGES` | `8` | iNat page budget per historical month |
 | `INAT_USER_AGENT` | WildWatchBoard/… | Identify the app to iNaturalist |
 
 ### Deploy on Fly.io
@@ -63,7 +66,7 @@ If `wildwatchboard` is taken, change `app` in `fly.toml` before launch.
 
 ## Region snapshot metrics
 
-Over the last **30 days** (pagination capped):
+Over the selected **7 / 30 / 90** day window, aggregated in **SQLite** (`COUNT`, `COUNT(DISTINCT …)`, `GROUP BY`):
 
 - Observations, unique species, research-grade %, observers
 - Quality mix (research / needs ID / casual)
@@ -81,9 +84,17 @@ Ranks top contributors by observation count. Shows the top 10 (about 5 visible, 
 
 A shared **7 / 30 / 90** day toggle drives snapshot, trends, invasives, leaderboard, and map together (`?window=` on those API routes).
 
-## Comparable trends
+## Observation archive + comparable trends
 
-`GET /api/trends` compares current vs previous windows for **7d, 30d, and 90d** (equal page budgets per period so Now is not inflated vs Prior). Observations are upserted into SQLite; dashboard responses reuse the exact last fetch payload.
+Observations are stored in SQLite with a **month coverage watermark** (`coverage_months`). The first loads **backfill missing months** (newest first, a few months per request); later loads only refresh the open month. Check progress on `/api/health` (`archive`) or the trends panel banner.
+
+`GET /api/trends` then serves:
+
+- **Now vs Prior** for the selected window, computed with SQL over the archive
+- **Multi-year history** (`yearly` series via `GROUP BY strftime('%Y', observed_on)`; depth from `ARCHIVE_YEARS_BACK`)
+- Current-year **monthly** series for deeper inspection
+
+Snapshot metrics use the same SQL analytics path. Map pins load from the archive with an intentional **500-observation cap** (most recent) so the map stays responsive; the UI notes this.
 
 ## Adding a region
 

@@ -23,6 +23,30 @@ export interface RegionSummary {
   description?: string
 }
 
+export interface ArchiveBackfillStatus {
+  yearsBack: number
+  requiredMonths: number
+  completeMonths: number
+  pendingMonths: number
+  complete: boolean
+}
+
+export interface YearlyTrendPoint {
+  year: number
+  observationCount: number
+  uniqueSpecies: number
+  observerCount: number
+  /** True for the current calendar year (partial YTD). */
+  isPartial: boolean
+}
+
+export interface MonthlyTrendPoint {
+  yearMonth: string
+  observationCount: number
+  uniqueSpecies: number
+  observerCount: number
+}
+
 export interface MetricsDto {
   region: string
   windowDays: number
@@ -33,6 +57,7 @@ export interface MetricsDto {
   qualityGrade: Record<QualityGrade, number>
   byIconicTaxon: Record<string, number>
   cachedAt: string | null
+  backfillStatus?: ArchiveBackfillStatus
 }
 
 export interface InvasiveSpeciesConfig {
@@ -107,6 +132,9 @@ export interface TrendsDto {
     researchGradePercentPts: number | null
     invasiveCountPct: number | null
   }
+  yearly: YearlyTrendPoint[]
+  monthly: MonthlyTrendPoint[]
+  backfillStatus: ArchiveBackfillStatus
 }
 
 export const ICONIC_TAXON_COLORS: Record<string, string> = {
