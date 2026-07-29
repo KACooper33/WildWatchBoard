@@ -1,9 +1,9 @@
 import type { MetricsDto, ObservationDto, QualityGrade } from '../../shared/types.ts'
 import { queryWindowMetrics } from '../db/analytics.ts'
 import { isoDateDaysAgo, isoDateToday } from '../db/sqlite.ts'
-import { ARCHIVE_YEARS_BACK, ensureRegionCoverage } from './archive.ts'
+import { ARCHIVE_YEARS_BACK, scheduleRegionBackfill } from './archive.ts'
 import { getRegion } from './geoFilter.ts'
-import { parseObservationWindow } from './timeWindow.ts'
+import { parseObservationWindow, parseTaxaFilter } from './timeWindow.ts'
 
 /** Kept for tests / fallbacks that still pass in-memory observation arrays. */
 export function computeMetrics(
@@ -47,6 +47,8 @@ export function computeMetrics(
     researchGradePercent,
     qualityGrade,
     byIconicTaxon,
+    groupCounts: byIconicTaxon,
+    appliedTaxa: [],
     cachedAt,
   }
 }
@@ -54,13 +56,16 @@ export function computeMetrics(
 export async function getMetricsForRegion(
   regionId: string | undefined,
   windowDaysRaw: unknown = 30,
+  taxaRaw: unknown = undefined,
 ): Promise<MetricsDto> {
   const windowDays = parseObservationWindow(windowDaysRaw)
+  const appliedTaxa = parseTaxaFilter(taxaRaw)
   const region = getRegion(regionId)
-  const backfillStatus = await ensureRegionCoverage(region.id, ARCHIVE_YEARS_BACK)
+  const backfillStatus = scheduleRegionBackfill(region.id, ARCHIVE_YEARS_BACK)
   const endDate = isoDateToday()
   const startDate = isoDateDaysAgo(windowDays)
-  const metrics = queryWindowMetrics(
+
+  const unfiltered = queryWindowMetrics(
     region.id,
     windowDays,
     startDate,
@@ -68,5 +73,22 @@ export async function getMetricsForRegion(
     [],
     new Date().toISOString(),
   )
-  return { ...metrics, backfillStatus }
+  const metrics =
+    appliedTaxa.length === 0
+      ? unfiltered
+      : queryWindowMetrics(
+          region.id,
+          windowDays,
+          startDate,
+          endDate,
+          appliedTaxa,
+          new Date().toISOString(),
+        )
+
+  return {
+    ...metrics,
+    groupCounts: unfiltered.byIconicTaxon,
+    appliedTaxa,
+    backfillStatus,
+  }
 }

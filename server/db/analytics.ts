@@ -109,6 +109,8 @@ export function queryWindowMetrics(
     researchGradePercent,
     qualityGrade,
     byIconicTaxon,
+    groupCounts: byIconicTaxon,
+    appliedTaxa: taxa,
     cachedAt,
   }
 }

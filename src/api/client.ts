@@ -21,15 +21,29 @@ async function getJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-function withWindow(path: string, regionId: string, windowDays: ObservationWindowDays) {
-  return `${path}?region=${encodeURIComponent(regionId)}&window=${windowDays}`
+function withWindow(
+  path: string,
+  regionId: string,
+  windowDays: ObservationWindowDays,
+  taxa: string[] = [],
+) {
+  const params = new URLSearchParams({
+    region: regionId,
+    window: String(windowDays),
+  })
+  if (taxa.length > 0) params.set('taxa', taxa.join(','))
+  return `${path}?${params.toString()}`
 }
 
 export function fetchRegions() {
   return getJson<{ defaultRegion: string; regions: RegionSummary[] }>('/api/regions')
 }
 
-export function fetchObservations(regionId: string, windowDays: ObservationWindowDays) {
+export function fetchObservations(
+  regionId: string,
+  windowDays: ObservationWindowDays,
+  taxa: string[] = [],
+) {
   return getJson<{
     region: string
     windowDays: number
@@ -37,12 +51,17 @@ export function fetchObservations(regionId: string, windowDays: ObservationWindo
     count: number
     limit: number
     capped: boolean
+    appliedTaxa: string[]
     observations: ObservationDto[]
-  }>(withWindow('/api/observations', regionId, windowDays))
+  }>(withWindow('/api/observations', regionId, windowDays, taxa))
 }
 
-export function fetchMetrics(regionId: string, windowDays: ObservationWindowDays) {
-  return getJson<MetricsDto>(withWindow('/api/metrics', regionId, windowDays))
+export function fetchMetrics(
+  regionId: string,
+  windowDays: ObservationWindowDays,
+  taxa: string[] = [],
+) {
+  return getJson<MetricsDto>(withWindow('/api/metrics', regionId, windowDays, taxa))
 }
 
 export function fetchInvasives(regionId: string, windowDays: ObservationWindowDays) {
@@ -53,6 +72,10 @@ export function fetchLeaderboard(regionId: string, windowDays: ObservationWindow
   return getJson<LeaderboardDto>(withWindow('/api/leaderboard', regionId, windowDays))
 }
 
-export function fetchTrends(regionId: string, windowDays: ObservationWindowDays) {
-  return getJson<TrendsDto>(withWindow('/api/trends', regionId, windowDays))
+export function fetchTrends(
+  regionId: string,
+  windowDays: ObservationWindowDays,
+  taxa: string[] = [],
+) {
+  return getJson<TrendsDto>(withWindow('/api/trends', regionId, windowDays, taxa))
 }

@@ -36,10 +36,11 @@ Serves the Vite `dist/` build and `/api/*` from one Node process (`PORT`, defaul
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `3001` | HTTP port |
-| `CACHE_TTL_MS` | `300000` (5 min) | Current-month archive refresh TTL |
+| `CACHE_TTL_MS` | `300000` (5 min) | In-memory TTL for live iNat fetches (invasives/leaderboard) |
+| `ARCHIVE_CURRENT_MONTH_TTL_MS` | `86400000` (1 day) | How often the current month is refreshed in the archive |
 | `SQLITE_PATH` | `data/wildwatchboard.sqlite` | SQLite database file |
 | `ARCHIVE_YEARS_BACK` | `5` | How many years of monthly history to keep |
-| `ARCHIVE_MONTHS_PER_CALL` | `3` | Missing months ingested per API request |
+| `ARCHIVE_MONTHS_PER_CALL` | `3` | Missing months ingested per background batch |
 | `ARCHIVE_MAX_PAGES` | `8` | iNat page budget per historical month |
 | `INAT_USER_AGENT` | WildWatchBoard/… | Identify the app to iNaturalist |
 
@@ -71,6 +72,8 @@ Over the selected **7 / 30 / 90** day window, aggregated in **SQLite** (`COUNT`,
 - Observations, unique species, research-grade %, observers
 - Quality mix (research / needs ID / casual)
 - Counts by life form (birds, mammals, plants, …)
+
+Select one or more life-form groups, then **Apply filter** to update snapshot, trends (including multi-year bars), and map pins via SQL `iconic_taxon` filters. Chip counts stay full-window so multi-select stays usable. **Clear** resets.
 
 ## Invasive species watch
 

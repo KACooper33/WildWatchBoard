@@ -22,6 +22,19 @@ export function parseObservationWindow(value: unknown): ObservationWindowDays {
   throw new Error(`Invalid time window: ${value}. Use 7, 30, or 90.`)
 }
 
+/** Parse `taxa=Aves,Plantae` or repeated `taxa=` query values. */
+export function parseTaxaFilter(raw: unknown): string[] {
+  const values: string[] = []
+  if (typeof raw === 'string' && raw.trim()) {
+    values.push(...raw.split(','))
+  } else if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === 'string' && item.trim()) values.push(...item.split(','))
+    }
+  }
+  return [...new Set(values.map((v) => v.trim()).filter(Boolean))]
+}
+
 export function observationQueryOptions(regionId: string | undefined, windowDays: number) {
   const region = getRegion(regionId)
   const maxPages =

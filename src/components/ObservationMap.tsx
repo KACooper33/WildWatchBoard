@@ -18,6 +18,8 @@ interface ObservationMapProps {
   /** Server pin limit (intentional performance cap). */
   mapLimit?: number
   capped?: boolean
+  appliedTaxa?: string[]
+  isFilterPending?: boolean
 }
 
 const FALLBACK_CENTER: [number, number] = [37.68, -121.82]
@@ -109,6 +111,8 @@ export function ObservationMap({
   isLoading,
   mapLimit = 500,
   capped = false,
+  appliedTaxa = [],
+  isFilterPending = false,
 }: ObservationMapProps) {
   const [boundary, setBoundary] = useState<FeatureCollection | null>(null)
 
@@ -135,11 +139,28 @@ export function ObservationMap({
     [observations],
   )
 
+  const filterActive = appliedTaxa.length > 0
+  const filterLabel = appliedTaxa.map((t) => ICONIC_TAXON_LABELS[t] ?? t).join(', ')
+  const showPending = isLoading || isFilterPending
+
   return (
     <section
-      className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] shadow-sm"
+      className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] shadow-sm"
       data-testid="observation-map"
+      aria-busy={showPending}
     >
+      {isFilterPending ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--color-panel)]/65">
+          <p className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-medium shadow-sm">
+            <span
+              className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent"
+              aria-hidden
+            />
+            Updating map…
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border)] px-4 py-3">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
@@ -148,11 +169,12 @@ export function ObservationMap({
           <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
             Shows up to {mapLimit.toLocaleString()} most recent pins for performance; snapshot and
             trends use the full archive.
+            {filterActive ? ` Filtered: ${filterLabel}.` : ''}
           </p>
         </div>
         <p className="text-sm text-[var(--color-ink-muted)]">
-          {isLoading
-            ? 'Loading…'
+          {showPending
+            ? 'Updating…'
             : capped
               ? `${mappable.length.toLocaleString()} mapped (capped)`
               : `${mappable.length.toLocaleString()} mapped`}

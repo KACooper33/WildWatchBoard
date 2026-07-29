@@ -56,6 +56,9 @@ export interface MetricsDto {
   researchGradePercent: number
   qualityGrade: Record<QualityGrade, number>
   byIconicTaxon: Record<string, number>
+  /** Unfiltered group counts for chip UI when a taxa filter is applied. */
+  groupCounts: Record<string, number>
+  appliedTaxa: string[]
   cachedAt: string | null
   backfillStatus?: ArchiveBackfillStatus
 }
@@ -123,6 +126,7 @@ export interface TrendsDto {
   cachedAt: string | null
   /** False only if a prior window cannot be fetched fairly. */
   priorAvailable: boolean
+  appliedTaxa: string[]
   current: TrendPeriodMetrics
   previous: TrendPeriodMetrics
   deltas: {
@@ -133,6 +137,8 @@ export interface TrendsDto {
     invasiveCountPct: number | null
   }
   yearly: YearlyTrendPoint[]
+  /** Unfiltered peak yearly count — keeps bar scale stable when a taxa filter is applied. */
+  yearlyScaleMax: number
   monthly: MonthlyTrendPoint[]
   backfillStatus: ArchiveBackfillStatus
 }

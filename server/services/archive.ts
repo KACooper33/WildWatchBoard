@@ -11,29 +11,24 @@ import { getObservationsForDateRange } from './inaturalist.ts'
 import type { ArchiveBackfillStatus } from '../../shared/types.ts'
 
 export const ARCHIVE_YEARS_BACK = Number(process.env.ARCHIVE_YEARS_BACK || 5)
-/** How many missing months to ingest per ensure() call (keeps requests from timing out). */
+/** How many missing months to ingest per background batch. */
 const MONTHS_PER_CALL = Number(process.env.ARCHIVE_MONTHS_PER_CALL || 3)
 /** Extra page budget for historical month chunks. */
 const HISTORY_MAX_PAGES = Number(process.env.ARCHIVE_MAX_PAGES || 8)
-const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000)
+/** How long current-month archive rows stay fresh before a background refresh. */
+const CURRENT_MONTH_TTL_MS = Number(
+  process.env.ARCHIVE_CURRENT_MONTH_TTL_MS || 24 * 60 * 60 * 1000,
+)
 
-const regionLocks = new Map<string, Promise<ArchiveBackfillStatus>>()
+const regionLocks = new Map<string, Promise<void>>()
 
 export function getBackfillStatus(
   regionId: string,
   yearsBack = ARCHIVE_YEARS_BACK,
 ): ArchiveBackfillStatus {
   const required = listYearMonths(yearsBack)
-  const completeSet = new Set(
-    required.filter((ym) => {
-      const row = getCoverageMonth(regionId, ym)
-      if (!row) return false
-      if (ym === currentYearMonth()) return row.status === 'partial' || row.status === 'complete'
-      return row.status === 'complete'
-    }),
-  )
-  // Current month counts as "covered" when we have any partial/complete row that is fresh enough
-  // for status display; pending = months with no usable coverage yet.
+  // Current month counts as "covered" when we have any partial/complete row;
+  // pending = months with no usable coverage yet.
   const pendingMonths = required.filter((ym) => {
     const row = getCoverageMonth(regionId, ym)
     if (!row) return true
@@ -60,7 +55,7 @@ function needsIngest(regionId: string, yearMonth: string): boolean {
   if (!isCurrent) return row.status !== 'complete'
 
   const age = Date.now() - Date.parse(row.fetchedAt)
-  return Number.isNaN(age) || age > CACHE_TTL_MS
+  return Number.isNaN(age) || age > CURRENT_MONTH_TTL_MS
 }
 
 async function ingestMonth(regionId: string, yearMonth: string): Promise<void> {
@@ -86,46 +81,46 @@ async function ingestMonth(regionId: string, yearMonth: string): Promise<void> {
 }
 
 /**
- * Ensure archive coverage for a region. Processes a bounded number of missing
- * months per call so HTTP handlers stay responsive; repeated calls finish the backfill.
+ * Kick off archive gap-filling in the background and return current status
+ * immediately so HTTP handlers can serve SQLite without waiting on iNat.
  */
-export async function ensureRegionCoverage(
+export function scheduleRegionBackfill(
   regionId: string | undefined,
   yearsBack = ARCHIVE_YEARS_BACK,
   maxMonthsPerCall = MONTHS_PER_CALL,
-): Promise<ArchiveBackfillStatus> {
+): ArchiveBackfillStatus {
   const region = getRegion(regionId)
   const lockKey = region.id
 
-  const existing = regionLocks.get(lockKey)
-  if (existing) {
-    await existing
-    return getBackfillStatus(region.id, yearsBack)
-  }
+  if (!regionLocks.has(lockKey)) {
+    const work = (async () => {
+      while (true) {
+        const required = listYearMonths(yearsBack)
+        const gaps = required.filter((ym) => needsIngest(region.id, ym))
+        // Prefer newest gaps first so recent windows become useful quickly.
+        gaps.reverse()
+        if (gaps.length === 0) break
 
-  const work = (async () => {
-    const required = listYearMonths(yearsBack)
-    const gaps = required.filter((ym) => needsIngest(region.id, ym))
-    // Prefer newest gaps first so recent windows become useful quickly.
-    gaps.reverse()
-
-    const batch = gaps.slice(0, Math.max(1, maxMonthsPerCall))
-    for (const yearMonth of batch) {
-      try {
-        await ingestMonth(region.id, yearMonth)
-      } catch (error) {
-        console.error(`[archive] failed ${region.id} ${yearMonth}:`, error)
-        break
+        const batch = gaps.slice(0, Math.max(1, maxMonthsPerCall))
+        let failed = false
+        for (const yearMonth of batch) {
+          try {
+            await ingestMonth(region.id, yearMonth)
+          } catch (error) {
+            console.error(`[archive] failed ${region.id} ${yearMonth}:`, error)
+            failed = true
+            break
+          }
+        }
+        if (failed) break
       }
-    }
+    })()
 
-    return getBackfillStatus(region.id, yearsBack)
-  })()
-
-  regionLocks.set(lockKey, work)
-  try {
-    return await work
-  } finally {
-    regionLocks.delete(lockKey)
+    regionLocks.set(lockKey, work)
+    void work.finally(() => {
+      regionLocks.delete(lockKey)
+    })
   }
+
+  return getBackfillStatus(region.id, yearsBack)
 }
